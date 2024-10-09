@@ -9,3 +9,106 @@ datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        String   @id @unique @default(cuid())
+  password  String
+  email     String   @unique
+  role      String   @default("USER") // This is a string attribute with a default value
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  profile   Profile? // This is a one-to-one relation
+  sessions  Session? // This is a one-to-one relation
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // This is a one-to-one relation
+  userId    String   @unique // This is a foreign key
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  name      String?
+  address1  String?
+  address2  String?
+  city      String?
+  state     String?
+  zip       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // This is a one-to-one relation
+  userId    String   @unique // This is a foreign key
+  Cart      Cart? // This is a one-to-one relation
+  orders    Order[] // This is a one-to-many relation
+}
+
+model Order {
+  id                   String          @id @default(cuid())
+  productTotalInCents  Int
+  shippingTotalInCents Int?
+  taxTotalInCents      Int?
+  totalInCents         Int
+  fulfilled            Boolean         @default(false)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  profile              Profile         @relation(fields: [profileId], references: [id], onDelete: Restrict) // This is a many-to-one relation
+  profileId            String
+  Order_Products       Order_Product[] // This is a many-to-many relation
+}
+
+model Cart {
+  id            String         @id @default(cuid())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  profile       Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade) // This is a one-to-one relation
+  profileId     String         @unique
+  Cart_Products Cart_Product[] // This is a many-to-many relation
+}
+
+model Product {
+  id              String          @id @default(cuid())
+  name            String
+  priceInCents    Int
+  imagePath       String?
+  description     String
+  isAvailable     Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  catagory        Catagory        @relation(fields: [catagoryId], references: [id], onDelete: Restrict) // This is a one-to-many relation
+  catagoryId      String
+  Orders_Products Order_Product[] // This is a many-to-many relation
+  Cart_Products   Cart_Product[] // This is a many-to-many relation
+}
+
+model Catagory {
+  id        String    @id @default(cuid())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[] // This is a many-to-one relation
+}
+
+model Order_Product {
+  order_id   String
+  product_id String
+  Order      Order   @relation(fields: [order_id], references: [id], onDelete: Restrict)
+  Product    Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  quantity   Int
+
+  @@id([order_id, product_id])
+  @@map("Orders_Product")
+}
+
+model Cart_Product {
+  cart_id    String
+  product_id String
+  Cart       Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  Product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  quantity   Int
+
+  @@id([cart_id, product_id])
+  @@map("Cart_Products")
+}
