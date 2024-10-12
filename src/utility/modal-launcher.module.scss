@@ -1,0 +1,24 @@
+.form {
+	background-color: darkseagreen;
+	color: black;
+	border: 1px solid black;
+	border-radius: 1rem;
+
+	label {
+		font-weight: bold;
+	}
+
+	input {
+		padding: 0.7rem;
+	}
+
+	button {
+		padding: 0.7rem;
+		background-color: darkseagreen;
+		color: black;
+		border: 1px solid black;
+		border-radius: 1rem;
+		cursor: pointer;
+		margin: 1rem 0 0 0;
+	}
+}
