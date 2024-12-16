@@ -1,4 +1,8 @@
 .form {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 1rem;
 	background-color: darkseagreen;
 	color: black;
 	border: 1px solid black;

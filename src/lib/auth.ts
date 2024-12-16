@@ -1,7 +1,7 @@
 import { Lucia } from 'lucia';
 import { PrismaAdapter } from '@lucia-auth/adapter-prisma';
 import { cookies } from 'next/headers';
-import db from './db';
+import db from '../db/db';
 
 const adapter = new PrismaAdapter(db.session, db.user);
 
@@ -12,10 +12,10 @@ export const lucia = new Lucia(adapter, {
 			secure: process.env.NODE_ENV === 'production',
 		},
 	},
-	getUserAttributes: (attributes: { role?: string; email?: string }) => {
+	getUserAttributes: (attributes: { role?: string; id?: string }) => {
 		return {
 			role: attributes.role,
-			email: attributes.email,
+			id: attributes.id,
 			// ...attributes,
 		};
 	},

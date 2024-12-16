@@ -10,6 +10,7 @@ export default function AdminLayout({ children }: Props) {
 			<Nav>
 				<NavLink href="/admin">Dashboard</NavLink>
 				<NavLink href="/admin/products">Products</NavLink>
+				<NavLink href="/admin/category">Categories</NavLink>
 				<NavLink href="/admin/users">Customers</NavLink>
 				<NavLink href="/admin/orders">Sales</NavLink>
 			</Nav>

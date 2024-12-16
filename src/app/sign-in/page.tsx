@@ -1,24 +1,9 @@
-// import DialogLauncher from '@/utility/dialog-launcher';
-import ModalLauncher from '@/utility/modal-launcher';
-// import ModelContent2 from '@/components/model-content2';
+import SignInForm from '@/components/forms/sign-in-form';
 
-interface SearchParams {
-	formMode?: string;
-}
-
-export default function SignInPage({
-	searchParams,
-}: {
-	searchParams: SearchParams;
-}) {
-	const formMode = searchParams.formMode || 'login';
-
+export default function SignInPage() {
 	return (
-		<>
-			<ModalLauncher formMode={formMode} />
-			{/* <DialogLauncher prompt="Choose Now">
-				<ModelContent2 />
-			</DialogLauncher> */}
-		</>
+		<main className="flex flex-col justify-center align-middle mt-10">
+			<SignInForm />
+		</main>
 	);
 }

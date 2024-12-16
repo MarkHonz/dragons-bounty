@@ -36,9 +36,9 @@ export default function ModalLauncher({ formMode }) {
 
 	return (
 		<div>
-			<dialog ref={modalRef} open>
+			<dialog className={styles.modal} ref={modalRef} open>
 				<form
-					className={styles.form}
+					// className="flex flex-col"
 					action={formAction}
 					formMethod="dialog"
 					ref={formRef}

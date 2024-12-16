@@ -51,6 +51,7 @@ model Order {
   shippingTotalInCents Int?
   taxTotalInCents      Int?
   totalInCents         Int
+  trackingNumber       String?
   fulfilled            Boolean         @default(false)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -74,29 +75,34 @@ model Product {
   priceInCents    Int
   imagePath       String?
   description     String
+  quantity        Int?
   isAvailable     Boolean         @default(true)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  catagory        Catagory        @relation(fields: [catagoryId], references: [id], onDelete: Restrict) // This is a one-to-many relation
-  catagoryId      String
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict) // This is a one-to-many relation
+  categoryId      String          @map("catagoryId")
   Orders_Products Order_Product[] // This is a many-to-many relation
   Cart_Products   Cart_Product[] // This is a many-to-many relation
 }
 
-model Catagory {
+model Category {
   id        String    @id @default(cuid())
-  name      String
+  name      String    @unique
+  isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   products  Product[] // This is a many-to-one relation
+
+  @@map("Category")
 }
 
 model Order_Product {
-  order_id   String
-  product_id String
-  Order      Order   @relation(fields: [order_id], references: [id], onDelete: Restrict)
-  Product    Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
-  quantity   Int
+  order_id     String
+  product_id   String
+  Order        Order   @relation(fields: [order_id], references: [id], onDelete: Restrict)
+  Product      Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  quantity     Int
+  priceInCents Int     @default(0)
 
   @@id([order_id, product_id])
   @@map("Orders_Product")
