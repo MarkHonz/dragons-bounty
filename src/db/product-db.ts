@@ -192,3 +192,71 @@ export const getAvailableProductsByCategoryId = async (categoryId: string) =>
 			category: true,
 		},
 	});
+
+// get product name by id
+export const getProductNameById = async (id: string) => {
+	try {
+		const product = await db.product.findUnique({
+			where: {
+				id,
+			},
+		});
+		return product ? product.name : null;
+	} catch (error) {
+		return error;
+	}
+};
+
+// get product price by id
+export const getProductPriceById = async (id: string) => {
+	try {
+		const product = await db.product.findUnique({
+			where: {
+				id,
+			},
+		});
+		return product ? product.priceInCents : null;
+	} catch (error) {
+		return error;
+	}
+};
+
+// get product quantity by id
+export const getProductQuantityById = async (id: string) => {
+	try {
+		const product = await db.product.findUnique({
+			where: {
+				id,
+			},
+		});
+		return product ? product.quantity : null;
+	} catch (error) {
+		return error;
+	}
+};
+
+// subtract product quantity from the product by id
+export const subtractProductQuantityById = async (
+	id: string,
+	quantity: number
+) => {
+	try {
+		const product = await db.product.findUnique({
+			where: {
+				id,
+			},
+		});
+		if (product) {
+			await db.product.update({
+				where: {
+					id,
+				},
+				data: {
+					quantity: (product.quantity ?? 1) - quantity,
+				},
+			});
+		}
+	} catch (error) {
+		return error;
+	}
+};

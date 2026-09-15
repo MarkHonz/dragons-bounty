@@ -1,9 +1,10 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { CheckCircle2, XCircle, MoreVertical } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -22,11 +23,15 @@ import Link from 'next/link';
 export const columns: ColumnDef<ProductProps>[] = [
 	{
 		accessorKey: 'isAvailable',
-		header: () => <div className="text-right">Available</div>,
+		header: () => <div className="text-left">Available</div>,
 		cell: ({ row }) => {
 			const isAvailable = row.getValue('isAvailable');
 
-			return <div>{isAvailable ? <CheckCircle2 /> : <XCircle />}</div>;
+			return (
+				<Badge variant={isAvailable ? 'secondary' : 'outline'}>
+					{isAvailable ? 'Available' : 'Unavailable'}
+				</Badge>
+			);
 		},
 	},
 	{

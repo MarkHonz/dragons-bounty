@@ -4,7 +4,7 @@ import { findActiveCategories } from '@/db/category-db';
 export default async function NewProductPage() {
 	const categories = await findActiveCategories();
 	return (
-		<main>
+		<main className="mx-auto max-w-md">
 			<AddProductForm categories={categories} />
 		</main>
 	);

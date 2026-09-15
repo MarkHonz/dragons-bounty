@@ -18,7 +18,7 @@ export default function ProductDelete({ id, imagePath }: Props) {
 					productDelete(id, imagePath ?? '');
 					router.refresh();
 				}}
-				className="text-red-500"
+				className="text-destructive"
 			>
 				Delete
 			</DropdownMenuItem>

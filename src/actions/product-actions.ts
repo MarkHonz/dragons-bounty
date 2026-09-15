@@ -9,9 +9,11 @@ import {
 } from '@aws-sdk/client-s3';
 import slugify from 'slugify';
 
+import { assertAdminOrThrow } from '@/lib/auth';
 import {
 	createProduct,
 	deleteProduct,
+	getProductQuantityById,
 	toggleProductAvailable,
 	updateProduct,
 } from '@/db/product-db';
@@ -28,6 +30,8 @@ export const productSubmit = async (
 	previousState: object,
 	formData: FormData
 ) => {
+	await assertAdminOrThrow();
+
 	const name = formData.get('name') as string | null;
 	let priceInCents = formData.get('priceInCents') as string | number | null;
 	const description = formData.get('description') as string | null;
@@ -135,6 +139,8 @@ export const productSubmit = async (
 };
 
 export const productDelete = async (id: string, imagePath: string) => {
+	await assertAdminOrThrow();
+
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -158,6 +164,8 @@ export const productDelete = async (id: string, imagePath: string) => {
 };
 
 export const toggleAvailable = async (id: string, isActive: boolean) => {
+	await assertAdminOrThrow();
+
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -174,6 +182,8 @@ export const productUpdate = async (
 	previousState: object,
 	formData: FormData
 ) => {
+	await assertAdminOrThrow();
+
 	const name = formData.get('name') as string | null;
 	let priceInCents = formData.get('priceInCents') as string | number | null;
 	const description = formData.get('description') as string | null;
@@ -309,4 +319,12 @@ export const productUpdate = async (
 	revalidatePath(`/products`, 'layout');
 	revalidatePath(`/products/${id}`, 'layout');
 	revalidatePath(`/products/${id}/edit`, 'layout');
+};
+
+//function to get the quantity of a product in stock
+export const getQuantityInStock = async (productId: string) => {
+	const productQuantity = (await getProductQuantityById(productId)) as
+		| number
+		| null;
+	return productQuantity ? productQuantity : null;
 };

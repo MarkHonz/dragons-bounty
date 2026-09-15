@@ -1,23 +1,18 @@
 import type { Metadata } from 'next';
-// import localFont from 'next/font/local';
-import { Inter } from 'next/font/google';
+import { Cinzel, Nunito } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 
-import MainHeader from '@/components/main-header';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-
-// const geistSans = localFont({
-// 	src: '../fonts/GeistVF.woff',
-// 	variable: '--font-geist-sans',
-// 	weight: '100 900',
-// });
-// const geistMono = localFont({
-// 	src: '../fonts/GeistMonoVF.woff',
-// 	variable: '--font-geist-mono',
-// 	weight: '100 900',
-// });
+const cinzel = Cinzel({
+	subsets: ['latin'],
+	variable: '--font-display',
+	weight: ['500', '600', '700'],
+});
+const nunito = Nunito({
+	subsets: ['latin'],
+	variable: '--font-sans',
+	weight: ['400', '500', '600', '700', '800'],
+});
 
 export const metadata: Metadata = {
 	title: "Dragon's Bounty",
@@ -26,21 +21,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
 	children,
-	modal,
 }: Readonly<{
 	children: React.ReactNode;
-	modal?: React.ReactNode;
 }>) {
 	return (
 		<html lang="en">
 			<body
 				className={cn(
 					'bg-background min-h-screen font-sans antialiased',
-					inter.variable
+					cinzel.variable,
+					nunito.variable
 				)}
 			>
-				{modal}
-				<MainHeader />
 				{children}
 			</body>
 		</html>

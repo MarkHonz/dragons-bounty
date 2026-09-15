@@ -8,8 +8,9 @@ export type OrderProps = {
 	totalInCents: number;
 	profileId: string;
 	createdAt: Date;
-	fulfilled: boolean;
+	fulfilled?: boolean;
 	trackingNumber?: string;
+	stripePaymentIntentId?: string | null;
 };
 
 export type OrderProductProps = {
@@ -19,6 +20,15 @@ export type OrderProductProps = {
 	priceInCents: number;
 };
 
+type CreateOrderProps = {
+	productTotalInCents: number;
+	taxTotalInCents: number;
+	shippingTotalInCents: number;
+	totalInCents: number;
+	profileId: string;
+	stripePaymentIntentId?: string;
+};
+
 // create an order for a user profile
 export const createOrder = async ({
 	productTotalInCents,
@@ -26,7 +36,8 @@ export const createOrder = async ({
 	shippingTotalInCents,
 	totalInCents,
 	profileId,
-}: OrderProps) => {
+	stripePaymentIntentId,
+}: CreateOrderProps) => {
 	try {
 		return await db.order.create({
 			data: {
@@ -34,6 +45,7 @@ export const createOrder = async ({
 				taxTotalInCents,
 				shippingTotalInCents,
 				totalInCents,
+				stripePaymentIntentId,
 				// fulfilled: false,
 				profile: {
 					connect: {
@@ -43,6 +55,22 @@ export const createOrder = async ({
 			},
 			include: {
 				Order_Products: true,
+			},
+		});
+	} catch (error) {
+		return error;
+	}
+};
+
+// get an order by its Stripe payment intent id (used for webhook idempotency
+// and the purchase-success confirmation lookup)
+export const getOrderByPaymentIntentId = async (
+	stripePaymentIntentId: string
+) => {
+	try {
+		return await db.order.findUnique({
+			where: {
+				stripePaymentIntentId,
 			},
 		});
 	} catch (error) {
@@ -89,7 +117,8 @@ export const getOrders = async () => {
 export const createOrderProduct = async (
 	orderId: string,
 	productId: string,
-	quantity: number
+	quantity: number,
+	priceInCents: number
 ) => {
 	try {
 		return await db.order_Product.create({
@@ -97,6 +126,7 @@ export const createOrderProduct = async (
 				order_id: orderId,
 				product_id: productId,
 				quantity,
+				priceInCents,
 			},
 		});
 	} catch (error) {
@@ -126,19 +156,29 @@ export const getOrderProducts = async () => {
 	}
 };
 
-// delete all order products
-export const deleteOrderProducts = async () => {
+// get unfulfilled orders
+export const getUnfulfilledOrders = async () => {
 	try {
-		return await db.order_Product.deleteMany();
+		return await db.order.findMany({
+			where: {
+				fulfilled: false,
+			},
+		});
 	} catch (error) {
 		return error;
 	}
 };
 
-// delete all orders
-export const deleteOrders = async () => {
+// update an order's fulfillment status and/or tracking number
+export const updateOrderFulfillment = async (
+	orderId: string,
+	data: { fulfilled?: boolean; trackingNumber?: string | null }
+) => {
 	try {
-		return await db.order.deleteMany();
+		return await db.order.update({
+			where: { id: orderId },
+			data,
+		});
 	} catch (error) {
 		return error;
 	}

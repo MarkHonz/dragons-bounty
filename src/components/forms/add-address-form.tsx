@@ -15,7 +15,6 @@ import { loadStripe } from '@stripe/stripe-js';
 import {
 	Form,
 	FormControl,
-	FormDescription,
 	FormField,
 	FormItem,
 	FormLabel,
@@ -23,7 +22,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
 	Card,
 	CardContent,
@@ -43,7 +41,6 @@ const formSchema = z // create a schema for the form data
 		city: z.string().min(2, 'City is required'),
 		state: z.string().min(2, 'State is required'),
 		zip: z.string().min(5, 'Zip code is required'),
-		useForShipping: z.boolean().optional().default(false),
 	});
 
 type Inputs = z.infer<typeof formSchema>;
@@ -77,7 +74,6 @@ export default function AddAddressForm({
 			city: '',
 			state: '',
 			zip: '',
-			useForShipping: false,
 		},
 	});
 
@@ -96,11 +92,17 @@ export default function AddAddressForm({
 	return (
 		<>
 			<Form {...form}>
+				<Card className="m-auto w-full max-w-md shadow-warm-sm">
+					<CardHeader>
+						<CardTitle className="text-center font-display text-2xl">
+							Shipping Address
+						</CardTitle>
+					</CardHeader>
 				<form
-					className="flex flex-col gap-2 max-w-md w-full m-auto p-6 bg-stone-300 rounded-lg"
+					className="flex flex-col gap-2"
 					onSubmit={form.handleSubmit(handleSubmit)}
 				>
-					<legend className="text-center text-lg p-2">Shipping Address</legend>
+					<CardContent className="flex flex-col gap-2">
 					<FormField
 						control={form.control}
 						name="address1"
@@ -176,29 +178,12 @@ export default function AddAddressForm({
 							);
 						}}
 					/>
-					<FormField
-						control={form.control}
-						name="useForShipping"
-						render={({ field }) => (
-							<FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-								<FormControl>
-									<Checkbox
-										checked={field.value}
-										onCheckedChange={field.onChange}
-									/>
-								</FormControl>
-								<div className="space-y-1 leading-none">
-									<FormLabel>Use this address for shipping</FormLabel>
-									<FormDescription>
-										By checking this box, you agree to use this address for
-										shipping.
-									</FormDescription>
-								</div>
-							</FormItem>
-						)}
-					/>
-					<Button type="submit">Add Address</Button>
+					<Button type="submit" className="rounded-full">
+						Add Address
+					</Button>
+					</CardContent>
 				</form>
+				</Card>
 			</Form>
 			{responseState.success && (
 				<Elements options={{ clientSecret }} stripe={stripePromise}>
@@ -258,9 +243,11 @@ function StripeCheckoutForm({ orderTotal }: StripeCheckoutFormProps) {
 
 	return (
 		<form onSubmit={handleSubmit}>
-			<Card className="m-3">
+			<Card className="mx-auto mt-3 w-full max-w-md shadow-warm-sm">
 				<CardHeader>
-					<CardTitle>Payment Information</CardTitle>
+					<CardTitle className="font-display text-xl">
+						Payment Information
+					</CardTitle>
 					<CardDescription className="text-destructive">
 						{errorMessage && <p>{errorMessage}</p>}
 					</CardDescription>
@@ -270,7 +257,10 @@ function StripeCheckoutForm({ orderTotal }: StripeCheckoutFormProps) {
 					<LinkAuthenticationElement className="mt-3" />
 				</CardContent>
 				<CardFooter className="flex justify-end">
-					<Button disabled={stripe == null || elements == null || isLoading}>
+					<Button
+						className="rounded-full"
+						disabled={stripe == null || elements == null || isLoading}
+					>
 						{isLoading
 							? 'Purchasing...'
 							: ` Purchase - ${formatCurrency(orderTotal / 100)}`}

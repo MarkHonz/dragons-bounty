@@ -11,7 +11,7 @@ type NavProps = {
 
 export function Nav({ children }: NavProps) {
 	return (
-		<nav className="bg-primary text-primary-foreground flex justify-center px-4">
+		<nav className="flex justify-center gap-1 border-t border-border bg-muted/60 px-4">
 			{children}
 		</nav>
 	);
@@ -23,8 +23,8 @@ export function NavLink(props: Omit<ComponentProps<typeof Link>, 'className'>) {
 		<Link
 			{...props}
 			className={cn(
-				'p-4 hover:bg-secondary hover:text-secondary-foreground focus-visible:bg-secondary focus-visible:text-secondary-foreground ',
-				pathname === props.href && 'bg-background text-foreground'
+				'px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-primary',
+				pathname === props.href && 'text-primary'
 			)}
 		/>
 	);

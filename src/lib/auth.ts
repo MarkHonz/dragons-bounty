@@ -1,6 +1,7 @@
 import { Lucia } from 'lucia';
 import { PrismaAdapter } from '@lucia-auth/adapter-prisma';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import db from '../db/db';
 
 const adapter = new PrismaAdapter(db.session, db.user);
@@ -79,6 +80,30 @@ export const verifyAuthSession = async () => {
 		}
 	} catch (error) {
 		console.error('Cookie Error:', error);
+	}
+
+	return result;
+};
+
+export const requireAdminSession = async () => {
+	const result = await verifyAuthSession();
+
+	if (result.user == null) {
+		redirect('/sign-in');
+	}
+
+	if (result.user.role !== 'ADMIN') {
+		redirect('/');
+	}
+
+	return result;
+};
+
+export const assertAdminOrThrow = async () => {
+	const result = await verifyAuthSession();
+
+	if (result.user == null || result.user.role !== 'ADMIN') {
+		throw new Error('Unauthorized');
 	}
 
 	return result;

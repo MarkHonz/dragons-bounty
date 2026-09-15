@@ -1,15 +1,20 @@
 'use server';
 
-import { deleteOrderProducts, deleteOrders } from '@/db/orders-db';
 import { revalidatePath } from 'next/cache';
+import { assertAdminOrThrow } from '@/lib/auth';
+import { updateOrderFulfillment } from '@/db/orders-db';
 
-// delete all order products then delete all orders
-export const deleteAllOrderProducts = async (): Promise<void> => {
-	try {
-		await Promise.all([deleteOrderProducts(), deleteOrders()]);
-		revalidatePath('/orders');
-		// success
-	} catch (error) {
-		throw error;
-	}
+export const updateOrderFulfillmentAction = async (formData: FormData) => {
+	await assertAdminOrThrow();
+
+	const orderId = formData.get('orderId')?.toString();
+	if (!orderId) return;
+
+	const fulfilled = formData.get('fulfilled') === 'on';
+	const trackingNumber = formData.get('trackingNumber')?.toString() || null;
+
+	await updateOrderFulfillment(orderId, { fulfilled, trackingNumber });
+
+	revalidatePath('/admin/orders');
+	revalidatePath(`/admin/orders/${orderId}`);
 };

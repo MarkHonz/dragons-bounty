@@ -24,6 +24,15 @@ export type CreateUserProps = {
 	password: string;
 };
 
+export type AddressType = {
+	name: string;
+	address1: string;
+	address2: string;
+	city: string;
+	state: string;
+	zip: string;
+};
+
 export const createUser = async ({
 	email,
 	password,
@@ -73,7 +82,6 @@ export const updateUserProfile = async ({
 		return await db.user.update({
 			where: { id: id },
 			data: {
-				role: 'USER',
 				profile: {
 					update: {
 						name: name,
@@ -93,8 +101,24 @@ export const updateUserProfile = async ({
 
 export const getUsers = async () => {
 	return await db.user.findMany({
-		include: { profile: {} },
+		include: { profile: { include: { Cart: true } } },
 	});
+};
+
+// paginated users
+export const getUsersPaginated = async (page: number, perPage: number) => {
+	const skip = Math.max(0, (page - 1) * perPage);
+	const [users, total] = await Promise.all([
+		db.user.findMany({
+			include: { profile: { include: { Cart: true } } },
+			skip,
+			take: perPage,
+			orderBy: { createdAt: 'desc' },
+		}),
+		db.user.count(),
+	]);
+
+	return { users, total };
 };
 
 export const deleteUser = async (id: string) => {
@@ -161,4 +185,33 @@ export const addUserAddress = async (
 	} catch (error) {
 		return error;
 	}
+};
+
+// get address by profile id
+export const getAddressByProfileId = async (id: string) => {
+	const profile = await db.profile.findUnique({
+		where: { id },
+	});
+	if (profile) {
+		return {
+			name: profile.name,
+			address1: profile.address1,
+			address2: profile.address2,
+			city: profile.city,
+			state: profile.state,
+			zip: profile.zip,
+		};
+	}
+	return null;
+};
+
+// get profile name by profile id
+export const getProfileNameById = async (id: string) => {
+	const profile = await db.profile.findUnique({
+		where: { id },
+	});
+	if (profile) {
+		return profile.name;
+	}
+	return null;
 };

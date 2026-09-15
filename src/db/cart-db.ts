@@ -1,10 +1,20 @@
 import db from '@/db/db';
+import { getProductById, ProductProps } from '@/db/product-db';
 
 export type CartProps = {
 	id: string;
 	quantity: number;
 	cart_id: string;
 	product_id: string;
+};
+
+export type EnrichedCartItem = {
+	productId: string;
+	name: string;
+	quantity: number;
+	price: number;
+	cartId: string;
+	numberInStock: number;
 };
 
 type AddItemToCartProps = {
@@ -132,6 +142,34 @@ export const isProductInCart = async (cartId: string, productId: string) => {
 		console.error(error);
 		return error;
 	}
+};
+
+// function to get the DB cart for a user, enriched with product name/price/stock
+export const getEnrichedCartByUserId = async (
+	userId: string
+): Promise<{ cartId: string; items: EnrichedCartItem[] }> => {
+	const cartId = (await getCartIdByUserId(userId)) as string;
+	if (!cartId) {
+		return { cartId: '', items: [] };
+	}
+
+	const cartItems = (await getCartById(cartId)) as CartProps[];
+
+	const items = await Promise.all(
+		cartItems.map(async (item) => {
+			const product = (await getProductById(item.product_id)) as ProductProps;
+			return {
+				productId: item.product_id,
+				name: product.name,
+				quantity: item.quantity,
+				price: product.priceInCents,
+				cartId,
+				numberInStock: product.quantity,
+			};
+		})
+	);
+
+	return { cartId, items };
 };
 
 // function to get the quantity of a product in the cart

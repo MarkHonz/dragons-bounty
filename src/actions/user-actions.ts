@@ -9,9 +9,15 @@ import {
 	createUser,
 	deleteUser,
 	findUserByEmail,
+	updateUserProfile,
 } from '@/db/user-db';
 import { hashUserPassword, verifyPassword } from '@/lib/hash';
-import { createAuthSession, destroyAuthSession } from '@/lib/auth';
+import {
+	assertAdminOrThrow,
+	createAuthSession,
+	destroyAuthSession,
+	verifyAuthSession,
+} from '@/lib/auth';
 import { addItemToCart, getCartById, getCartIdByUserId } from '@/db/cart-db';
 import { getProductById, ProductProps } from '@/db/product-db';
 
@@ -88,16 +94,17 @@ export const userSubmit = async (previousState: object, formData: FormData) => {
 		const cartId: string = (await getCartIdByUserId(user.id)) as string;
 		// json parse the cartItems and add each item to the cart
 
-		parsedCartItems.map(async (item: CartItem) => {
-			console.log('item:', item);
-			const productId = item['productId'] as string;
-			const quantity = item['quantity'] as number;
-			await addItemToCart({
-				cartId,
-				productId,
-				quantity,
-			});
-		});
+		await Promise.all(
+			parsedCartItems.map(async (item: CartItem) => {
+				const productId = item['productId'] as string;
+				const quantity = parseInt(item['quantity'] as unknown as string, 10) || 1;
+				await addItemToCart({
+					cartId,
+					productId,
+					quantity,
+				});
+			})
+		);
 	}
 
 	// redirect('/'); // Redirect to the home page
@@ -192,43 +199,48 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	console.log('databaseCartItems:', databaseCartItems);
 
 	// map over the localCartItems and add them to the databaseCartItems if they don't already exist
-	localCartItems.map(async (localCartItem) => {
-		if (localCartItem.productId) {
-			const itemExists = databaseCartItems.find(
-				(databaseCartItem) =>
-					databaseCartItem.product_id === localCartItem.productId
-			);
-			if (itemExists === undefined) {
-				await addItemToCart({
-					cartId: cartId,
-					productId: localCartItem.productId,
-					quantity: localCartItem.quantity ?? 1,
-				});
+	await Promise.all(
+		localCartItems.map(async (localCartItem) => {
+			if (localCartItem.productId) {
+				const itemExists = databaseCartItems.find(
+					(databaseCartItem) =>
+						databaseCartItem.product_id === localCartItem.productId
+				);
+				if (itemExists === undefined) {
+					await addItemToCart({
+						cartId: cartId,
+						productId: localCartItem.productId,
+						quantity:
+							parseInt(localCartItem.quantity as unknown as string, 10) || 1,
+					});
+				}
 			}
-		}
-	});
+		})
+	);
 
 	// map over the databaseCartItems and add items to the response object if they don't already exist
-	databaseCartItems.map(async (databaseCartItem) => {
-		const itemExists = localCartItems.find(
-			(localCartItem) => localCartItem.productId === databaseCartItem.product_id
-		);
-		// make sure the item exists and has a productId
-		if (itemExists === undefined) {
-			// get product info from the database and add it to the response object
-			if (databaseCartItem.product_id) {
-				const product = (await getProductById(
-					databaseCartItem.product_id
-				)) as ProductProps;
-				response.cartItems.push({
-					productId: databaseCartItem.product_id,
-					quantity: databaseCartItem.quantity,
-					name: product.name,
-					price: product.priceInCents,
-				});
+	await Promise.all(
+		databaseCartItems.map(async (databaseCartItem) => {
+			const itemExists = localCartItems.find(
+				(localCartItem) => localCartItem.productId === databaseCartItem.product_id
+			);
+			// make sure the item exists and has a productId
+			if (itemExists === undefined) {
+				// get product info from the database and add it to the response object
+				if (databaseCartItem.product_id) {
+					const product = (await getProductById(
+						databaseCartItem.product_id
+					)) as ProductProps;
+					response.cartItems.push({
+						productId: databaseCartItem.product_id,
+						quantity: databaseCartItem.quantity,
+						name: product.name,
+						price: product.priceInCents,
+					});
+				}
 			}
-		}
-	});
+		})
+	);
 
 	// redirect('/'); // Redirect to the home page
 	response.success = true; // Set the success flag to true
@@ -237,6 +249,7 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 
 export const userDelete = async (id: string) => {
 	try {
+		await assertAdminOrThrow();
 		await deleteUser(id);
 		console.log(`deleted ${id}`);
 		revalidatePath('/', 'layout');
@@ -245,13 +258,14 @@ export const userDelete = async (id: string) => {
 	}
 };
 
-export const userAuth = (
-	formMode: string,
-	previousState: never,
-	formData: FormData
-) => {
-	if (formMode === 'login') return userLogin(previousState, formData);
-	return userSubmit(previousState, formData);
+// admin: delete a customer from their detail page and return to the customer list
+export const deleteUserAction = async (formData: FormData) => {
+	await assertAdminOrThrow();
+	const id = formData.get('id')?.toString();
+	if (id) {
+		await deleteUser(id);
+	}
+	redirect('/admin/customers');
 };
 
 export const userLogout = async () => {
@@ -324,6 +338,70 @@ export const userAddAddress = async (
 		return response;
 	} catch {
 		response.errors.push('Error adding address');
+		return response;
+	}
+};
+
+// update the signed-in user's own profile/address
+export const userUpdateProfile = async (
+	previousState: object,
+	formData: FormData
+) => {
+	const name = formData.get('name') as string | null;
+	const address1 = formData.get('address1') as string | null;
+	const address2 = formData.get('address2') as string | null;
+	const city = formData.get('city') as string | null;
+	const state = formData.get('state') as string | null;
+	const zip = formData.get('zip') as string | null;
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	const schema = z.object({
+		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+		address1: z.string().min(2, { message: 'Address is required' }),
+		address2: z.string().optional(),
+		city: z.string().min(2, { message: 'City is required' }),
+		state: z.string().min(2, { message: 'State is required' }),
+		zip: z.string().min(5, { message: 'Zip is required' }),
+	});
+
+	try {
+		schema.parse({ name, address1, address2, city, state, zip });
+	} catch (error) {
+		const { errors } = error as z.ZodError;
+		errors.map((error) => {
+			response.errors.push(error.message);
+		});
+		return response;
+	}
+
+	if (
+		typeof name !== 'string' ||
+		typeof address1 !== 'string' ||
+		typeof address2 !== 'string' ||
+		typeof city !== 'string' ||
+		typeof state !== 'string' ||
+		typeof zip !== 'string'
+	) {
+		response.errors.push('Invalid form data');
+		return response;
+	}
+
+	const { user } = await verifyAuthSession();
+	if (user == null) {
+		response.errors.push('You must be signed in to update your profile');
+		return response;
+	}
+
+	try {
+		await updateUserProfile({ id: user.id, name, address1, address2, city, state, zip });
+		response.success = true;
+		revalidatePath('/account', 'layout');
+		return response;
+	} catch {
+		response.errors.push('Error updating profile');
 		return response;
 	}
 };

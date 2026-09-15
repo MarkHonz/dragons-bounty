@@ -3,22 +3,27 @@ import { getProducts, ProductProps } from '@/db/product-db';
 import Link from 'next/link';
 import { columns } from './_components/columns';
 import { ProductTable } from './_components/product-table';
+import { Card } from '@/components/ui/card';
 
 export default async function AdminProductsPage() {
-	const products: ProductProps[] = (await getProducts()) as ProductProps[];
+	const products = (await getProducts()) as ProductProps[];
 
 	return (
-		<main className=" max-w-xl m-auto">
-			<header className="flex justify-between items-center gap-4">
-				<h1 className="text-4xl mb-4 p-3">Products</h1>
-				<Button asChild>
+		<main className="mx-auto max-w-5xl">
+			<header className="mb-6 flex items-center justify-between gap-4">
+				<h1 className="font-display text-3xl font-semibold">Products</h1>
+				<Button asChild className="rounded-full">
 					<Link href="/admin/products/new">Add Product</Link>
 				</Button>
 			</header>
 			{products.length === 0 ? (
-				<h2 className="text-center p-2">No products found</h2>
+				<h2 className="p-2 text-center text-muted-foreground">
+					No products found
+				</h2>
 			) : (
-				<ProductTable columns={columns} data={products} />
+				<Card className="p-2 shadow-warm-sm">
+					<ProductTable columns={columns} data={products} />
+				</Card>
 			)}
 		</main>
 	);

@@ -1,49 +1,117 @@
 import { userLogout } from '@/actions/user-actions';
 import Link from 'next/link';
-import { BsCart } from 'react-icons/bs';
+import Image from 'next/image';
+import { Search, ShoppingBag } from 'lucide-react';
 
 import { verifyAuthSession } from '@/lib/auth';
 import { CartProps, getCartById, getCartIdByUserId } from '@/db/cart-db';
+import { findActiveCategories } from '@/db/category-db';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import MobileNav from '@/components/mobile-nav';
 
 export default async function MainHeader() {
-	// get the authenticated user
 	const sessionUserId = await verifyAuthSession();
-	let authenticatedUser = '';
-	if (sessionUserId.user !== null) {
-		authenticatedUser = sessionUserId.user.id;
-	} else {
-		authenticatedUser = 'guest';
-	}
-	// get the cartId from the userId
-	let cartId: string | null = '';
+	const authenticatedUser =
+		sessionUserId.user !== null ? sessionUserId.user.id : 'guest';
+
+	let cartId: string | null = 'guest';
 	if (authenticatedUser !== 'guest') {
 		cartId = (await getCartIdByUserId(authenticatedUser)) as string;
-	} else {
-		cartId = 'guest';
 	}
 
-	// get the cart items from database
 	const cartItems = (await getCartById(cartId)) as CartProps[];
-
-	// get the total quantity of items in the cart
 	const totalQuantity = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
+	const categories = await findActiveCategories();
+	const navItems = [
+		...categories.slice(0, 4).map((category) => ({
+			href: `/#${category.id}`,
+			label: category.name,
+		})),
+		{ href: '/#gallery', label: 'Gallery' },
+	];
+
 	return (
-		<header className="flex flex-row gap-5 justify-between p-5 pb-10">
-			<Link href="/">
-				<h1 className="text-5xl">{"Dragon's Bounty"}</h1>
-			</Link>
-			<Link href="/sign-in">Sign In</Link>
-			<form action={userLogout}>
-				<button>Logout</button>
-			</form>
-			<div className="w-10 h-10 bg-gray-100 rounded-full flex justify-center items-center relative">
-				<Link href="/cart">
-					<BsCart size={25} color={'blue'} />
-					<span className="absolute top-2/3 left-2/3 bg-red-500 text-white text-sm w-5 h-5 rounded-full flex justify-center items-center">
-						{totalQuantity}
+		<header className="sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur">
+			<div className="mx-auto flex max-w-[1320px] items-center justify-between gap-6 px-5 py-3 md:px-10">
+				<Link href="/" className="flex flex-shrink-0 items-center gap-3">
+					<Image
+						src="/images/CoinLogo.png"
+						alt="Dragon's Bounty coin logo"
+						width={126}
+						height={126}
+						className="h-[126px] w-[126px] object-contain"
+					/>
+					<span className="whitespace-nowrap font-display text-xl font-semibold md:text-[2.5rem]">
+						Dragon&apos;s Bounty
 					</span>
 				</Link>
+
+				<nav className="hidden items-center gap-8 md:flex">
+					<Link href="/" className="text-sm font-bold text-foreground">
+						Shop
+					</Link>
+					{navItems.map((item) => (
+						<Link
+							key={item.href}
+							href={item.href}
+							className="text-sm font-semibold text-muted-foreground hover:text-primary"
+						>
+							{item.label}
+						</Link>
+					))}
+				</nav>
+
+				<div className="flex flex-shrink-0 items-center gap-3">
+					<Button
+						variant="outline"
+						size="icon"
+						className="hidden rounded-full sm:inline-flex"
+						aria-label="Search"
+					>
+						<Search className="h-4 w-4" />
+					</Button>
+
+					{authenticatedUser === 'guest' ? (
+						<Link
+							href="/sign-in"
+							className="hidden whitespace-nowrap rounded-full border border-border bg-card px-4 py-2 text-sm font-bold sm:inline-block"
+						>
+							Sign In
+						</Link>
+					) : (
+						<form action={userLogout} className="hidden sm:inline-block">
+							<button className="whitespace-nowrap rounded-full border border-border bg-card px-4 py-2 text-sm font-bold">
+								Logout
+							</button>
+						</form>
+					)}
+
+					<Link href="/cart" className="relative">
+						<Button
+							variant="default"
+							size="icon"
+							className="rounded-full"
+							aria-label="Cart"
+						>
+							<ShoppingBag className="h-4 w-4" />
+						</Button>
+						{totalQuantity > 0 && (
+							<Badge
+								variant="secondary"
+								className="absolute -right-1 -top-1 h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-background p-0 text-[11px]"
+							>
+								{totalQuantity}
+							</Badge>
+						)}
+					</Link>
+
+					<MobileNav
+						navItems={navItems}
+						isSignedIn={authenticatedUser !== 'guest'}
+					/>
+				</div>
 			</div>
 		</header>
 	);

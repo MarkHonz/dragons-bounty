@@ -4,6 +4,7 @@ import z from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
+import { assertAdminOrThrow } from '@/lib/auth';
 import {
 	createCategory,
 	deleteCategory,
@@ -16,6 +17,8 @@ export const categorySubmit = async (
 	previousState: any,
 	formData: FormData
 ) => {
+	await assertAdminOrThrow();
+
 	const name = formData.get('name') as string | null;
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -57,6 +60,8 @@ export const categorySubmit = async (
 };
 
 export const categoryDelete = async (id: string) => {
+	await assertAdminOrThrow();
+
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -73,6 +78,8 @@ export const categoryDelete = async (id: string) => {
 };
 
 export const toggleCategoryActive = async (id: string, isActive: boolean) => {
+	await assertAdminOrThrow();
+
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -89,6 +96,8 @@ export const toggleCategoryActive = async (id: string, isActive: boolean) => {
 };
 
 export const categoryUpdate = async (id: string, name: string) => {
+	await assertAdminOrThrow();
+
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,

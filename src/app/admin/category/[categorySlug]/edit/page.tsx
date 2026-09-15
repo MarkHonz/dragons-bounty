@@ -14,11 +14,11 @@ export default async function EditCategoryPage({
 	const category = await findCategoryById(categorySlug);
 
 	return (
-		<main>
+		<main className="mx-auto max-w-md">
 			{category ? (
 				<EditCategoryForm category={category} />
 			) : (
-				<p>Category not found</p>
+				<p className="text-center text-muted-foreground">Category not found</p>
 			)}
 		</main>
 	);

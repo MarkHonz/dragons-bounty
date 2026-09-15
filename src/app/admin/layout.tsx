@@ -1,20 +1,17 @@
-import { Nav, NavLink } from '@/components/nav';
+import AdminHeader from '@/components/admin-header';
+import { requireAdminSession } from '@/lib/auth';
 
 type Props = {
 	children: React.ReactNode;
 };
 
-export default function AdminLayout({ children }: Props) {
+export default async function AdminLayout({ children }: Props) {
+	await requireAdminSession();
+
 	return (
 		<>
-			<Nav>
-				<NavLink href="/admin">Dashboard</NavLink>
-				<NavLink href="/admin/products">Products</NavLink>
-				<NavLink href="/admin/category">Categories</NavLink>
-				<NavLink href="/admin/users">Customers</NavLink>
-				<NavLink href="/admin/orders">Sales</NavLink>
-			</Nav>
-			<div className="container my-6 ">{children}</div>
+			<AdminHeader />
+			<div className="container my-8">{children}</div>
 		</>
 	);
 }

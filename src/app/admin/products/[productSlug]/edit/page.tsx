@@ -17,11 +17,11 @@ export default async function EditProductPage({
 	const categories = await findActiveCategories();
 
 	return (
-		<main>
+		<main className="mx-auto max-w-md">
 			{product ? (
 				<EditProductForm product={product} categories={categories} />
 			) : (
-				<p>Product not found</p>
+				<p className="text-center text-muted-foreground">Product not found</p>
 			)}
 		</main>
 	);

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { userLogin } from '@/actions/user-actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -51,83 +52,91 @@ export default function SignInForm() {
 
 		const result = await userLogin({}, formData);
 
-		// if (result.success && result.cartItems.length > 0) {
-		// add cart items from result.cartItems to cartItems in local storage
-		const newCartItems = cartItems.concat(result.cartItems || []);
-		localStorage.setItem('cartItems', JSON.stringify(newCartItems));
-		// }
-
-		console.log('data:', data);
-		console.log('result:', result);
-		console.log('newCartItems:', newCartItems);
 		if (result.success) {
+			// the guest cart has now been merged into the DB cart server-side;
+			// clear the local copy since the DB is authoritative from here on
+			localStorage.removeItem('cartItems');
+			localStorage.removeItem('cartId');
 			router.back();
+			router.refresh();
 		}
 	};
 
 	return (
 		<Form {...form}>
-			<form
-				className="flex flex-col gap-2 max-w-md w-full m-auto p-2 bg-stone-300 rounded-lg"
-				onSubmit={form.handleSubmit(handleSubmit)}
-			>
-				<legend className="text-center text-lg p-2">Sign In</legend>
-				<FormMessage>
-					{/* // display error messages here */}
-					{Object.keys(form.formState.errors).length > 0 && (
-						<div>
-							{Object.values(form.formState.errors).map((error) => (
-								<div key={error.message}>{error.message}</div>
-							))}
-						</div>
-					)}
-				</FormMessage>
-				<fieldset>
-					<FormField
-						control={form.control}
-						name="email"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input
-											placeholder="email address"
-											type="email"
-											{...field}
-										/>
-									</FormControl>
-									<FormLabel className="p-2">Email</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="password"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input placeholder="password" type="password" {...field} />
-									</FormControl>
-									<FormLabel className="p-2">Password</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
-				</fieldset>
-				<Button type="submit">Submit</Button>
-				<Link
-					className="text-center mt-5 border-t-2 text-blue-800"
-					href="/create-account"
+			<Card className="m-auto w-full max-w-md shadow-warm-sm">
+				<CardHeader>
+					<CardTitle className="text-center font-display text-2xl">
+						Sign In
+					</CardTitle>
+				</CardHeader>
+				<form
+					className="flex flex-col gap-2"
+					onSubmit={form.handleSubmit(handleSubmit)}
 				>
-					{/* <Button type="button" variant="secondary" className="m-2"> */}
-					Create A New Account
-					{/* </Button> */}
-				</Link>
-			</form>
+					<CardContent className="flex flex-col gap-2">
+						<FormMessage>
+							{/* // display error messages here */}
+							{Object.keys(form.formState.errors).length > 0 && (
+								<div>
+									{Object.values(form.formState.errors).map((error) => (
+										<div key={error.message}>{error.message}</div>
+									))}
+								</div>
+							)}
+						</FormMessage>
+						<fieldset className="flex flex-col gap-2">
+							<FormField
+								control={form.control}
+								name="email"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input
+													placeholder="email address"
+													type="email"
+													{...field}
+												/>
+											</FormControl>
+											<FormLabel className="p-2">Email</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+							<FormField
+								control={form.control}
+								name="password"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input
+													placeholder="password"
+													type="password"
+													{...field}
+												/>
+											</FormControl>
+											<FormLabel className="p-2">Password</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+						</fieldset>
+						<Button type="submit" className="rounded-full">
+							Submit
+						</Button>
+						<Link
+							className="mt-5 border-t border-border pt-4 text-center text-primary"
+							href="/create-account"
+						>
+							Create A New Account
+						</Link>
+					</CardContent>
+				</form>
+			</Card>
 		</Form>
 	);
 }

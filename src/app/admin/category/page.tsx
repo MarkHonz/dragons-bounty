@@ -1,6 +1,8 @@
 'use server';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import {
 	Table,
@@ -10,8 +12,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { CheckCircle2, MoreVertical, XCircle } from 'lucide-react';
-// import { formatCurrency, formatNumber } from "@/lib/formatters"
+import { MoreVertical } from 'lucide-react';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -27,57 +28,61 @@ import { getCategories } from '@/db/category-db';
 export default async function CategoryPage() {
 	const categories = await getCategories();
 	return (
-		<main className=" max-w-lg m-auto">
-			<header className="flex justify-between items-center gap-4">
-				<h1 className="text-4xl mb-4 p-3">Categories</h1>
-				<Button asChild>
+		<main className="mx-auto max-w-2xl">
+			<header className="mb-6 flex items-center justify-between gap-4">
+				<h1 className="font-display text-3xl font-semibold">Categories</h1>
+				<Button asChild className="rounded-full">
 					<Link href="/admin/category/new">Add Category</Link>
 				</Button>
 			</header>
 			{categories.length === 0 ? (
-				<p>No categories found</p>
+				<p className="p-2 text-center text-muted-foreground">
+					No categories found
+				</p>
 			) : (
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead className="w-0">
-								{/* <span className="sr-only">Available For Purchase</span> */}
-								Active
-							</TableHead>
-							<TableHead>Name</TableHead>
-							{/* <TableHead>Products</TableHead> */}
-							<TableHead>Actions</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{categories.map((category) => {
-							return (
-								<TableRow key={category.id}>
-									<TableCell>
-										{category.isActive ? <CheckCircle2 /> : <XCircle />}
-									</TableCell>
-									<TableCell>{category.name}</TableCell>
-									{/* <TableCell>{category.products.length}</TableCell> */}
-									<TableCell>
-										<DropdownMenu>
-											<DropdownMenuTrigger>
-												<MoreVertical />
-											</DropdownMenuTrigger>
-											<DropdownMenuContent>
-												<Link href={`/admin/category/${category.id}/edit`}>
-													<DropdownMenuItem>Edit</DropdownMenuItem>
-												</Link>
-												<CategoryToggleActive category={category} />
-												<DropdownMenuSeparator />
-												<CategoryDelete id={category.id} />
-											</DropdownMenuContent>
-										</DropdownMenu>
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
+				<Card className="p-2 shadow-warm-sm">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead className="w-0">Active</TableHead>
+								<TableHead>Name</TableHead>
+								<TableHead>Actions</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{categories.map((category) => {
+								return (
+									<TableRow key={category.id}>
+										<TableCell>
+											<Badge variant={category.isActive ? 'secondary' : 'outline'}>
+												{category.isActive ? 'Active' : 'Inactive'}
+											</Badge>
+										</TableCell>
+										<TableCell>{category.name}</TableCell>
+										<TableCell>
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button variant="ghost" className="h-8 w-8 p-0">
+														<span className="sr-only">Open menu</span>
+														<MoreVertical className="h-4 w-4" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<Link href={`/admin/category/${category.id}/edit`}>
+														<DropdownMenuItem>Edit</DropdownMenuItem>
+													</Link>
+													<CategoryToggleActive category={category} />
+													<DropdownMenuSeparator />
+													<CategoryDelete id={category.id} />
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</Card>
 			)}
 		</main>
 	);

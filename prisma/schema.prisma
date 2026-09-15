@@ -11,14 +11,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @unique @default(cuid())
+  id        String    @id @default(cuid())
   password  String
-  email     String   @unique
-  role      String   @default("USER") // This is a string attribute with a default value
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  email     String    @unique
+  role      String    @default("USER") // This is a string attribute with a default value
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   profile   Profile? // This is a one-to-one relation
-  sessions  Session? // This is a one-to-one relation
+  sessions  Session[] // This is a one-to-many relation (important!)
 }
 
 model Session {
@@ -26,7 +26,7 @@ model Session {
   createdAt DateTime @default(now())
   expiresAt DateTime
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // This is a one-to-one relation
-  userId    String   @unique // This is a foreign key
+  userId    String // This is a foreign key
 }
 
 model Profile {
@@ -53,6 +53,7 @@ model Order {
   totalInCents         Int
   trackingNumber       String?
   fulfilled            Boolean         @default(false)
+  stripePaymentIntentId String?        @unique
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   profile              Profile         @relation(fields: [profileId], references: [id], onDelete: Restrict) // This is a many-to-one relation
@@ -117,4 +118,13 @@ model Cart_Product {
 
   @@id([cart_id, product_id])
   @@map("Cart_Products")
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  url       String
+  key       String? // optional S3 key
+  caption   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

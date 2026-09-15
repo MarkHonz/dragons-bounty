@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { userSubmit } from '@/actions/user-actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -67,86 +68,103 @@ export default function CreateUserForm() {
 
 	return (
 		<Form {...form}>
-			<form
-				className="flex flex-col gap-5 max-w-md w-full m-auto p-2 bg-stone-300"
-				onSubmit={form.handleSubmit(handleSubmit)}
-			>
-				<legend className="text-center text-lg p-2">Create An Account</legend>
-				<fieldset>
-					<FormField
-						control={form.control}
-						name="name"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input placeholder="username" type="text" {...field} />
-									</FormControl>
-									<FormLabel className="p-2">Name</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="email"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input
-											placeholder="email address"
-											type="email"
-											{...field}
-										/>
-									</FormControl>
-									<FormLabel className="p-2">Email</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="password"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input placeholder="password" type="password" {...field} />
-									</FormControl>
-									<FormLabel className="p-2">Password</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="passwordconfirm"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input
-											placeholder="retype password"
-											type="password"
-											{...field}
-										/>
-									</FormControl>
-									<FormLabel className="p-2">Confirm Password</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
-				</fieldset>
-				<Button type="submit">Submit</Button>
-				<Link className="text-center mt-5 border-t-2" href="/sign-in">
-					Sign In To An Existing Account
-				</Link>
-			</form>
+			<Card className="m-auto w-full max-w-md shadow-warm-sm">
+				<CardHeader>
+					<CardTitle className="text-center font-display text-2xl">
+						Create An Account
+					</CardTitle>
+				</CardHeader>
+				<form
+					className="flex flex-col gap-5"
+					onSubmit={form.handleSubmit(handleSubmit)}
+				>
+					<CardContent className="flex flex-col gap-2">
+						<fieldset className="flex flex-col gap-2">
+							<FormField
+								control={form.control}
+								name="name"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input placeholder="username" type="text" {...field} />
+											</FormControl>
+											<FormLabel className="p-2">Name</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+							<FormField
+								control={form.control}
+								name="email"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input
+													placeholder="email address"
+													type="email"
+													{...field}
+												/>
+											</FormControl>
+											<FormLabel className="p-2">Email</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+							<FormField
+								control={form.control}
+								name="password"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input
+													placeholder="password"
+													type="password"
+													{...field}
+												/>
+											</FormControl>
+											<FormLabel className="p-2">Password</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+							<FormField
+								control={form.control}
+								name="passwordconfirm"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input
+													placeholder="retype password"
+													type="password"
+													{...field}
+												/>
+											</FormControl>
+											<FormLabel className="p-2">Confirm Password</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+						</fieldset>
+						<Button type="submit" className="rounded-full">
+							Submit
+						</Button>
+						<Link
+							className="mt-5 border-t border-border pt-4 text-center text-primary"
+							href="/sign-in"
+						>
+							Sign In To An Existing Account
+						</Link>
+					</CardContent>
+				</form>
+			</Card>
 		</Form>
 	);
 }

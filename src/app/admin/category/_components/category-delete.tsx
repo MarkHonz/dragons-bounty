@@ -14,7 +14,7 @@ export default function CategoryDelete({ id }: Props) {
 				onClick={() => {
 					categoryDelete(id);
 				}}
-				className="text-red-500"
+				className="text-destructive"
 			>
 				Delete
 			</DropdownMenuItem>

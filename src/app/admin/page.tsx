@@ -1,5 +1,3 @@
-import { verifyAuthSession } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import {
 	Card,
 	CardContent,
@@ -9,41 +7,31 @@ import {
 } from '@/components/ui/card';
 
 export default async function AdminDashboardPage() {
-	const result = await verifyAuthSession();
-
-	if (result.user == null) {
-		return redirect('/sign-in');
-	}
-	console.log(result.user.role);
-	console.log('user', result.user);
-
-	// if (result.user.role === 'USER') {
-	// 	return redirect('/');
-	// }
-
 	return (
 		<>
-			<h1 className="text-center text-4xl">Admin Dashboard</h1>
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-				<Card>
+			<h1 className="text-center font-display text-3xl font-semibold">
+				Admin Dashboard
+			</h1>
+			<div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				<Card className="shadow-warm-sm">
 					<CardHeader>
-						<CardTitle>Users</CardTitle>
+						<CardTitle className="font-display text-xl">Users</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<CardDescription>Manage users</CardDescription>
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="shadow-warm-sm">
 					<CardHeader>
-						<CardTitle>Products</CardTitle>
+						<CardTitle className="font-display text-xl">Products</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<CardDescription>Manage products</CardDescription>
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="shadow-warm-sm">
 					<CardHeader>
-						<CardTitle>Orders</CardTitle>
+						<CardTitle className="font-display text-xl">Orders</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<CardDescription>Manage orders</CardDescription>

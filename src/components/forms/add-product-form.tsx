@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { productSubmit } from '@/actions/product-actions';
 import { CategoryProps } from '@/db/category-db';
@@ -101,11 +102,17 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 	// return the form component
 	return (
 		<Form {...form}>
-			<form
-				className="flex flex-col gap-2 max-w-md w-full m-auto p-2 mt-10 bg-stone-300 rounded-lg"
-				onSubmit={form.handleSubmit(handleSubmit)}
-			>
-				<legend className="text-center text-lg">Add Product</legend>
+			<Card className="m-auto mt-4 w-full max-w-md shadow-warm-sm">
+				<CardHeader>
+					<CardTitle className="text-center font-display text-2xl">
+						Add Product
+					</CardTitle>
+				</CardHeader>
+				<form
+					className="flex flex-col gap-2"
+					onSubmit={form.handleSubmit(handleSubmit)}
+				>
+					<CardContent className="flex flex-col gap-2">
 				<fieldset>
 					<FormField
 						control={form.control}
@@ -223,8 +230,12 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 						}}
 					/>
 				</fieldset>
-				<Button type="submit">Submit</Button>
-			</form>
+					<Button type="submit" className="rounded-full">
+						Submit
+					</Button>
+					</CardContent>
+				</form>
+			</Card>
 		</Form>
 	);
 }
