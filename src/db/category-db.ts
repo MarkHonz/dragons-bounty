@@ -3,14 +3,21 @@ import db from './db';
 export type CategoryProps = {
 	id: string;
 	name: string;
+	description: string | null;
 	isActive: boolean;
 };
 
-export const createCategory = async (name: string) => {
+export type CreateCategoryProps = {
+	name: string;
+	description?: string;
+};
+
+export const createCategory = async ({ name, description }: CreateCategoryProps) => {
 	try {
 		return await db.category.create({
 			data: {
 				name,
+				description,
 			},
 		});
 	} catch (error) {
@@ -57,12 +64,16 @@ export const updateCategoryActive = async (id: string, isActive: boolean) => {
 	}
 };
 
-export const updateCategoryName = async (id: string, name: string) => {
+export const updateCategory = async (
+	id: string,
+	{ name, description }: CreateCategoryProps
+) => {
 	try {
 		return await db.category.update({
 			where: { id: id },
 			data: {
-				name: name,
+				name,
+				description,
 			},
 		});
 	} catch (error) {

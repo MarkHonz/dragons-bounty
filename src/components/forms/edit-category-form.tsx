@@ -20,6 +20,11 @@ import { categoryUpdate } from '@/actions/category-actions';
 const formSchema = z // create a schema for the form data
 	.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+		description: z
+			.string()
+			.min(2, { message: 'Description must be at least 2 characters' })
+			.optional()
+			.or(z.literal('')),
 	});
 
 type Inputs = z.infer<typeof formSchema>;
@@ -27,6 +32,7 @@ type Inputs = z.infer<typeof formSchema>;
 type EditCategoryFormProps = {
 	category: {
 		name: string;
+		description: string | null;
 		id: string;
 		isActive: boolean;
 		createdAt: Date;
@@ -40,11 +46,12 @@ export default function EditCategoryForm({ category }: EditCategoryFormProps) {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			name: category.name,
+			description: category.description ?? '',
 		},
 	});
 
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
-		const result = await categoryUpdate(category.id, data.name);
+		const result = await categoryUpdate(category.id, data.name, data.description);
 		if (result.success) {
 			router.back();
 		}
@@ -74,6 +81,25 @@ export default function EditCategoryForm({ category }: EditCategoryFormProps) {
 												<Input {...field} id="name" defaultValue={category.name} />
 											</FormControl>
 											<FormLabel className="p-2">Name</FormLabel>
+											<FormMessage {...field} />
+										</FormItem>
+									);
+								}}
+							/>
+							<FormField
+								control={form.control}
+								name="description"
+								render={({ field }) => {
+									return (
+										<FormItem className="pb-2">
+											<FormControl>
+												<Input
+													{...field}
+													id="description"
+													defaultValue={category.description ?? ''}
+												/>
+											</FormControl>
+											<FormLabel className="p-2">Description</FormLabel>
 											<FormMessage {...field} />
 										</FormItem>
 									);

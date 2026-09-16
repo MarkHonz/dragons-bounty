@@ -8,8 +8,8 @@ import { assertAdminOrThrow } from '@/lib/auth';
 import {
 	createCategory,
 	deleteCategory,
+	updateCategory,
 	updateCategoryActive,
-	updateCategoryName,
 } from '@/db/category-db';
 
 export const categorySubmit = async (
@@ -20,6 +20,7 @@ export const categorySubmit = async (
 	await assertAdminOrThrow();
 
 	const name = formData.get('name') as string | null;
+	const description = formData.get('description') as string | null;
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -28,12 +29,18 @@ export const categorySubmit = async (
 	// Create a schema for the form data
 	const schema = z.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+		description: z
+			.string()
+			.min(2, { message: 'Description must be at least 2 characters' })
+			.optional()
+			.or(z.literal('')),
 	});
 
 	try {
 		// Validate the form data
 		schema.parse({
 			name,
+			description: description ?? undefined,
 		});
 	} catch (error) {
 		const { errors } = error as z.ZodError;
@@ -50,7 +57,7 @@ export const categorySubmit = async (
 	}
 
 	// Create the category
-	await createCategory(name);
+	await createCategory({ name, description: description || undefined });
 
 	// Revalidate the category page
 	revalidatePath(`/category`, 'layout');
@@ -95,7 +102,11 @@ export const toggleCategoryActive = async (id: string, isActive: boolean) => {
 	return response;
 };
 
-export const categoryUpdate = async (id: string, name: string) => {
+export const categoryUpdate = async (
+	id: string,
+	name: string,
+	description?: string
+) => {
 	await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
@@ -104,7 +115,7 @@ export const categoryUpdate = async (id: string, name: string) => {
 	};
 
 	// Update the category
-	await updateCategoryName(id, name);
+	await updateCategory(id, { name, description });
 
 	// Revalidate the category page
 	revalidatePath(`/category`, 'layout');

@@ -46,6 +46,7 @@ export default async function CategoryPage() {
 							<TableRow>
 								<TableHead className="w-0">Active</TableHead>
 								<TableHead>Name</TableHead>
+								<TableHead>Description</TableHead>
 								<TableHead>Actions</TableHead>
 							</TableRow>
 						</TableHeader>
@@ -59,6 +60,9 @@ export default async function CategoryPage() {
 											</Badge>
 										</TableCell>
 										<TableCell>{category.name}</TableCell>
+										<TableCell className="max-w-xs truncate text-muted-foreground">
+											{category.description || '—'}
+										</TableCell>
 										<TableCell>
 											<DropdownMenu>
 												<DropdownMenuTrigger asChild>

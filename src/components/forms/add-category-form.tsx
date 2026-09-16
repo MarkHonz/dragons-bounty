@@ -20,6 +20,11 @@ import { categorySubmit } from '@/actions/category-actions';
 const formSchema = z // create a schema for the form data
 	.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+		description: z
+			.string()
+			.min(2, { message: 'Description must be at least 2 characters' })
+			.optional()
+			.or(z.literal('')),
 	});
 
 type Inputs = z.infer<typeof formSchema>;
@@ -30,6 +35,7 @@ export default function AddCategoryForm() {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			name: '',
+			description: '',
 		},
 	});
 
@@ -68,6 +74,21 @@ export default function AddCategoryForm() {
 												<Input placeholder="category" type="text" {...field} />
 											</FormControl>
 											<FormLabel className="pl-2">Name</FormLabel>
+											<FormMessage />
+										</FormItem>
+									);
+								}}
+							/>
+							<FormField
+								control={form.control}
+								name="description"
+								render={({ field }) => {
+									return (
+										<FormItem>
+											<FormControl>
+												<Input placeholder="description" type="text" {...field} />
+											</FormControl>
+											<FormLabel className="pl-2">Description</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);

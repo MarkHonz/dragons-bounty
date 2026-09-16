@@ -3,24 +3,16 @@ import {
 	ProductProps,
 } from '@/db/product-db';
 import { CategoryProps } from '@/db/category-db';
-import {
-	Card,
-	CardContent,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { getCategories } from '@/db/category-db';
 import Link from 'next/link';
-import { formatCurrency } from '@/lib/formatters';
 import { CheckCircle } from 'lucide-react';
 import PhotoGallery from '@/components/photo-gallery';
+import ProductCard from '@/components/product-card';
 
 export default async function HomePage() {
 	const categories = (await getCategories()) as CategoryProps[];
-	const imageUrl = process.env.NEXT_PUBLIC_S3_BASE_URL;
 
 	const categoryProducts = await Promise.all(
 		categories.map(async (category) => {
@@ -95,13 +87,14 @@ export default async function HomePage() {
 			<div className="mx-auto flex max-w-[1320px] flex-wrap gap-3 px-5 pb-2 sm:px-10">
 				<Badge className="px-5 py-2 text-sm">All Goods</Badge>
 				{categories.map((category) => (
-					<Badge
-						key={category.id}
-						variant="outline"
-						className="border-border bg-card px-5 py-2 text-sm font-bold text-foreground"
-					>
-						{category.name}
-					</Badge>
+					<Link key={category.id} href={`/category/${category.id}`}>
+						<Badge
+							variant="outline"
+							className="border-border bg-card px-5 py-2 text-sm font-bold text-foreground"
+						>
+							{category.name}
+						</Badge>
+					</Link>
 				))}
 			</div>
 
@@ -111,38 +104,23 @@ export default async function HomePage() {
 					id={category.id}
 					className="mx-auto max-w-[1320px] scroll-mt-24 px-5 py-10 sm:px-10"
 				>
-					<h2 className="mb-7 font-display text-3xl font-semibold">
+					<h2
+						className={`font-display text-3xl font-semibold ${
+							category.description ? 'mb-1' : 'mb-7'
+						}`}
+					>
 						{category.name}
 					</h2>
+					{category.description && (
+						<p className="mb-7 max-w-2xl text-base leading-relaxed text-muted-foreground">
+							{category.description}
+						</p>
+					)}
 					<div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 						{categoryProducts
 							.find((cp) => cp.categoryId === category.id)
 							?.products.map((product) => (
-								<Link key={product.id} href={`/products/${product.id}`}>
-									<Card className="flex h-full flex-col overflow-hidden shadow-warm-sm transition-shadow hover:shadow-warm-md">
-										<div className="relative">
-											<Image
-												src={`${imageUrl}${product.imagePath}`}
-												alt={'Image of ' + product.name}
-												width={320}
-												height={320}
-												className="aspect-square w-full object-cover"
-											/>
-											<Badge className="absolute left-3 top-3">
-												{product.category.name}
-											</Badge>
-										</div>
-										<CardHeader className="pb-1.5">
-											<CardTitle className="text-lg">{product.name}</CardTitle>
-										</CardHeader>
-										<CardContent className="line-clamp-2 flex-1 text-sm text-muted-foreground">
-											{product.description}
-										</CardContent>
-										<CardFooter className="pt-2 text-lg font-extrabold">
-											{formatCurrency(product.priceInCents / 100)}
-										</CardFooter>
-									</Card>
-								</Link>
+								<ProductCard key={product.id} product={product} />
 							))}
 					</div>
 				</section>

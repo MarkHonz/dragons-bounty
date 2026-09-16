@@ -26,7 +26,7 @@ export default async function MainHeader() {
 	const categories = await findActiveCategories();
 	const navItems = [
 		...categories.slice(0, 4).map((category) => ({
-			href: `/#${category.id}`,
+			href: `/category/${category.id}`,
 			label: category.name,
 		})),
 		{ href: '/#gallery', label: 'Gallery' },
