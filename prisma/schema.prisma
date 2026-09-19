@@ -21,6 +21,30 @@ model User {
   profile            Profile? // This is a one-to-one relation
   sessions           Session[] // This is a one-to-many relation (important!)
   verificationTokens VerificationToken[] // This is a one-to-many relation
+  roleChangesReceived RoleChange[]       @relation("RoleChangeTarget")
+  roleChangesMade     RoleChange[]       @relation("RoleChangeActor")
+  orderNotes          OrderNote[]
+  activity            ActivityLog[]
+}
+
+// One row each time an admin makes or removes another admin. The emails and
+// names are copied in, so the history still reads correctly after someone is
+// renamed or deleted (targetId / actorId then become null).
+model RoleChange {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  fromRole    String
+  toRole      String
+  targetEmail String
+  targetName  String?
+  actorEmail  String
+  actorName   String?
+  target      User?    @relation("RoleChangeTarget", fields: [targetId], references: [id], onDelete: SetNull)
+  targetId    String?
+  actor       User?    @relation("RoleChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId     String?
+
+  @@index([createdAt])
 }
 
 model VerificationToken {
@@ -69,11 +93,20 @@ model Order {
   refundedAt           DateTime? // set once the order is fully refunded
   refundedAmountInCents Int?
   stripeRefundId       String? // null on a refunded order means it was marked refunded manually
+  shipToName           String? // the shipping address as it was at checkout; null on orders placed before this was saved
+  shipToAddress1       String?
+  shipToAddress2       String?
+  shipToCity           String?
+  shipToState          String?
+  shipToZip            String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   profile              Profile         @relation(fields: [profileId], references: [id], onDelete: Restrict) // This is a many-to-one relation
   profileId            String
+  discountInCents      Int             @default(0) // taken off the items total by a discount code
+  discountCode         String? // the code used, as text (no relation, so deleting a code never touches order history)
   Order_Products       Order_Product[] // This is a many-to-many relation
+  notes                OrderNote[]
 }
 
 model Cart {
@@ -82,6 +115,7 @@ model Cart {
   updatedAt     DateTime       @updatedAt
   profile       Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade) // This is a one-to-one relation
   profileId     String         @unique
+  discountCode  String? // the code the customer has applied, cleared once the order is placed
   Cart_Products Cart_Product[] // This is a many-to-many relation
 }
 
@@ -92,6 +126,7 @@ model Product {
   description     String
   quantity        Int?
   isAvailable     Boolean         @default(true)
+  isFeatured      Boolean         @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   category        Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict) // This is a one-to-many relation
@@ -99,6 +134,35 @@ model Product {
   Orders_Products Order_Product[] // This is a many-to-many relation
   Cart_Products   Cart_Product[] // This is a many-to-many relation
   images          ProductImage[] // Position 0 is the cover image
+  variants        ProductVariant[] // optional named options (size, colour...), each with its own stock
+}
+
+// One choosable option of a product. A product with no rows here is sold as a
+// single item; with rows, a shopper must pick one.
+model ProductVariant {
+  id           String   @id @default(cuid())
+  name         String
+  priceInCents Int? // null = use the product's price
+  quantity     Int
+  position     Int
+  createdAt    DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String
+
+  @@index([productId, position])
+}
+
+// The cart as it was when checkout began, kept until the order exists. Stripe
+// only allows 500 characters of metadata, which is too little for a real cart.
+model CheckoutSnapshot {
+  id              String   @id @default(cuid())
+  paymentIntentId String   @unique
+  userId          String
+  cartId          String
+  itemsJson       String
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model ProductImage {
@@ -117,6 +181,7 @@ model Category {
   name        String    @unique
   description String?
   isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0) // position on the storefront: lowest first
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   products    Product[] // This is a many-to-one relation
@@ -127,22 +192,77 @@ model Category {
 model Order_Product {
   order_id     String
   product_id   String
+  variant_id   String  @default("") // "" = the product has no options
+  variantName  String  @default("") // the option's name when it was bought
   Order        Order   @relation(fields: [order_id], references: [id], onDelete: Restrict)
   Product      Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
   quantity     Int
   priceInCents Int     @default(0)
 
-  @@id([order_id, product_id])
+  @@id([order_id, product_id, variant_id])
   @@map("Orders_Product")
 }
 
 model Cart_Product {
   cart_id    String
   product_id String
+  variant_id String  @default("") // "" = the product has no options
   Cart       Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade)
   Product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity   Int
 
-  @@id([cart_id, product_id])
+  @@id([cart_id, product_id, variant_id])
   @@map("Cart_Products")
+}
+
+model DiscountCode {
+  id              String   @id @default(cuid())
+  code            String   @unique // stored uppercase; matched ignoring case; never renamed
+  kind            String // PERCENT | FIXED | FREE_SHIPPING
+  value           Int // percent (1-100) or cents; 0 for FREE_SHIPPING
+  oncePerCustomer Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// One row at most (id "shop"); with no row the shop uses the defaults in src/lib/pricing.ts
+model ShippingSettings {
+  id               String   @id
+  flatRateInCents  Int
+  freeOverInCents  Int? // null = shipping is never free by total
+  updatedAt        DateTime @updatedAt
+}
+
+// An admin-only note on an order. The author's email and name are copied in so
+// the note still reads correctly if the account changes.
+model OrderNote {
+  id          String   @id @default(cuid())
+  body        String
+  createdAt   DateTime @default(now())
+  authorEmail String
+  authorName  String?
+  author      User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId    String?
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+
+  @@index([orderId])
+}
+
+// One line for each change an admin makes. `summary` is a finished sentence, so
+// an entry still reads correctly after the thing it mentions is renamed or deleted.
+model ActivityLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  actorEmail String
+  actorName  String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId    String?
+  area       String // ORDER | PRODUCT | CATEGORY | PRICING | CUSTOMER
+  summary    String
+  orderId    String? // set when the entry is about one order
+
+  @@index([createdAt])
+  @@index([orderId])
 }
