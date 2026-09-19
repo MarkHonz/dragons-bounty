@@ -1,29 +1,18 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreVertical } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 import { ProductProps } from '@/db/product-db';
 import { formatCurrency } from '@/lib/formatters';
-import ProductToggleAvailable from './product-toggle-available';
-import ProductDelete from './product-delete';
-import Link from 'next/link';
+import ProductActions from './product-actions';
+import SortableHeader from '@/components/sortable-header';
 
 export const columns: ColumnDef<ProductProps>[] = [
 	{
 		accessorKey: 'isAvailable',
-		header: () => <div className="text-left">Available</div>,
+		header: ({ column }) => <SortableHeader column={column} label="Available" />,
 		cell: ({ row }) => {
 			const isAvailable = row.getValue('isAvailable');
 
@@ -36,11 +25,16 @@ export const columns: ColumnDef<ProductProps>[] = [
 	},
 	{
 		accessorKey: 'name',
-		header: 'Name',
+		header: ({ column }) => <SortableHeader column={column} label="Name" />,
+		sortingFn: 'alphanumeric',
 	},
 	{
 		accessorKey: 'quantity',
-		header: () => <div className="text-left">Quantity</div>,
+		header: ({ column }) => (
+			<SortableHeader column={column} label="Quantity" align="center" />
+		),
+		// first click sorts low to high, like Name sorts A to Z
+		sortDescFirst: false,
 		cell: ({ row }) => {
 			const quantity = row.getValue('quantity') as number;
 
@@ -49,7 +43,10 @@ export const columns: ColumnDef<ProductProps>[] = [
 	},
 	{
 		accessorKey: 'priceInCents',
-		header: () => <div className="text-right">Amount</div>,
+		header: ({ column }) => (
+			<SortableHeader column={column} label="Amount" align="right" />
+		),
+		sortDescFirst: false,
 		cell: ({ row }) => {
 			const amount = Number(row.getValue('priceInCents'));
 			const formatted = formatCurrency(amount / 100);
@@ -59,35 +56,11 @@ export const columns: ColumnDef<ProductProps>[] = [
 	},
 	{
 		accessorKey: 'category.name',
-		header: 'Category',
+		header: ({ column }) => <SortableHeader column={column} label="Category" />,
+		sortingFn: 'alphanumeric',
 	},
 	{
 		id: 'actions',
-		cell: ({ row }) => {
-			const product = row.original;
-
-			return (
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" className="h-8 w-8 p-0">
-							<span className="sr-only">Open menu</span>
-							<MoreVertical className="h-4 w-4" />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuLabel>Actions</DropdownMenuLabel>
-						<DropdownMenuSeparator />
-						<Link href={`/admin/products/${product.id}/edit`}>
-							<DropdownMenuItem>Edit</DropdownMenuItem>
-						</Link>
-						<ProductToggleAvailable
-							product={{ id: product.id, isActive: product.isAvailable }}
-						/>
-						<ProductDelete id={product.id} imagePath={product.imagePath} />
-						<DropdownMenuSeparator />
-					</DropdownMenuContent>
-				</DropdownMenu>
-			);
-		},
+		cell: ({ row }) => <ProductActions product={row.original} />,
 	},
 ];

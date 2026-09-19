@@ -117,6 +117,24 @@ export default function CartTable({
 		router.refresh();
 	};
 
+	const quantityForm = (item: CartItem) => (
+		<form onSubmit={handleUpdateQuantity} className="flex items-center gap-2">
+			<input type="hidden" name="productId" value={item.productId} />
+			<Input
+				type="number"
+				name="quantity"
+				id="quantity"
+				min="1"
+				max={item.numberInStock}
+				defaultValue={item.quantity}
+				className="h-9 w-16"
+			/>
+			<Button type="submit" variant="outline" size="sm">
+				Update
+			</Button>
+		</form>
+	);
+
 	return (
 		// display the cart items in a table
 		localCartItems.length === 0 ? (
@@ -125,7 +143,7 @@ export default function CartTable({
 			</p>
 		) : (
 			<>
-				<Table>
+				<Table className="hidden sm:table">
 					<TableHeader>
 						<TableRow>
 							<TableHead>Product</TableHead>
@@ -140,30 +158,7 @@ export default function CartTable({
 							return (
 								<TableRow key={item.productId}>
 									<TableCell className="font-semibold">{item.name}</TableCell>
-									<TableCell>
-										<form
-											onSubmit={handleUpdateQuantity}
-											className="flex items-center gap-2"
-										>
-											<input
-												type="hidden"
-												name="productId"
-												value={item.productId}
-											/>
-											<Input
-												type="number"
-												name="quantity"
-												id="quantity"
-												min="1"
-												max={item.numberInStock}
-												defaultValue={item.quantity}
-												className="h-9 w-16"
-											/>
-											<Button type="submit" variant="outline" size="sm">
-												Update
-											</Button>
-										</form>
-									</TableCell>
+									<TableCell>{quantityForm(item)}</TableCell>
 									<TableCell>{formatCurrency(item.price / 100)}</TableCell>
 									<TableCell>
 										{formatCurrency((item.price * item.quantity) / 100)}
@@ -179,6 +174,27 @@ export default function CartTable({
 						})}
 					</TableBody>
 				</Table>
+				<div className="flex flex-col divide-y divide-border sm:hidden">
+					{localCartItems.map((item: CartItem) => (
+						<div key={item.productId} className="flex flex-col gap-3 py-4">
+							<div className="flex items-start justify-between gap-3">
+								<div>
+									<p className="font-semibold">{item.name}</p>
+									<p className="text-sm text-muted-foreground">
+										{formatCurrency(item.price / 100)} each
+									</p>
+								</div>
+								<RemoveItem cartId={cartId.current} productId={item.productId} />
+							</div>
+							<div className="flex items-center justify-between gap-3">
+								{quantityForm(item)}
+								<p className="font-semibold">
+									{formatCurrency((item.price * item.quantity) / 100)}
+								</p>
+							</div>
+						</div>
+					))}
+				</div>
 				<div className="flex flex-row justify-end w-full pt-3">
 					<h2 className="font-display text-lg font-semibold">
 						Cart Total: {formatCurrency(totalPrice / 100)}

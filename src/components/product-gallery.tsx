@@ -1,13 +1,18 @@
-import React from 'react';
-import { getPhotos } from '@/db/photos-db';
+import Link from 'next/link';
+import Image from 'next/image';
+import {
+	getAvailableProducts,
+	getCoverImage,
+	ProductProps,
+} from '@/db/product-db';
 
-export default async function PhotoGallery(
-	{ limit }: { limit?: number } = { limit: 12 }
-) {
-	const photos = await getPhotos();
-	const list = limit ? photos.slice(0, limit) : photos;
+export default async function ProductGallery() {
+	const imageUrl = process.env.NEXT_PUBLIC_S3_BASE_URL;
+	const products = ((await getAvailableProducts()) as ProductProps[]).filter(
+		(product) => getCoverImage(product)
+	);
 
-	if (!list || list.length === 0) {
+	if (products.length === 0) {
 		return null;
 	}
 
@@ -23,18 +28,20 @@ export default async function PhotoGallery(
 				</p>
 			</div>
 			<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-				{list.map((p) => (
-					<div
-						key={p.id}
+				{products.map((product) => (
+					<Link
+						key={product.id}
+						href={`/products/${product.id}`}
 						className="overflow-hidden rounded-2xl border border-border bg-muted shadow-warm-sm"
 					>
-						{/* eslint-disable-next-line @next/next/no-img-element */}
-						<img
-							src={p.url}
-							alt={p.caption ?? 'gallery photo'}
+						<Image
+							src={`${imageUrl}${getCoverImage(product)}`}
+							alt={product.name}
+							width={320}
+							height={320}
 							className="h-40 w-full object-cover"
 						/>
-					</div>
+					</Link>
 				))}
 			</div>
 		</section>

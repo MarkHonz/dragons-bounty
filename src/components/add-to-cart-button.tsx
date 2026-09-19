@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { addToCart } from '@/actions/cart-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +17,7 @@ type AddToCartButtonProps = {
 	numberInStock: number;
 };
 
-export default function SubmitButton({
+export default function AddToCartButton({
 	cartId,
 	productId,
 	quantity,
@@ -22,6 +25,18 @@ export default function SubmitButton({
 	price,
 	numberInStock,
 }: AddToCartButtonProps) {
+	const router = useRouter();
+	const [pending, setPending] = useState(false);
+
+	const viewCart = { label: 'View cart', onClick: () => router.push('/cart') };
+	const notifyAdded = (quantityValue: string) =>
+		toast.success('Added to cart', {
+			description: `${quantityValue} \u00d7 ${name}`,
+			action: viewCart,
+		});
+	const notifyAlreadyInCart = () =>
+		toast('Already in your cart', { description: name, action: viewCart });
+
 	// handle the submit event
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -29,11 +44,28 @@ export default function SubmitButton({
 
 		// authenticated users: DB is the source of truth, no localStorage involved
 		if (cartId !== 'guest') {
-			const formData = new FormData();
-			formData.append('cartId', cartId);
-			formData.append('productId', productId);
-			formData.append('quantity', quantityValue);
-			await addToCart({}, formData);
+			setPending(true);
+			try {
+				const formData = new FormData();
+				formData.append('cartId', cartId);
+				formData.append('productId', productId);
+				formData.append('quantity', quantityValue);
+				const result = await addToCart({}, formData);
+				if (result.success) {
+					notifyAdded(quantityValue);
+					// the header's cart count is rendered on the server
+					router.refresh();
+				} else if (result.alreadyInCart) {
+					notifyAlreadyInCart();
+				} else {
+					toast.error(result.errors[0] ?? "Couldn't add this item to your cart");
+				}
+			} catch (error) {
+				console.error('Failed to add to cart', error);
+				toast.error("Couldn't add this item to your cart");
+			} finally {
+				setPending(false);
+			}
 			return;
 		}
 
@@ -49,6 +81,7 @@ export default function SubmitButton({
 			(item: { productId: string }) => item.productId === productId
 		);
 		if (productInCart) {
+			notifyAlreadyInCart();
 			return;
 		}
 
@@ -59,6 +92,7 @@ export default function SubmitButton({
 			price,
 		});
 		localStorage.setItem('cartItems', JSON.stringify(cartItems));
+		notifyAdded(quantityValue);
 	};
 
 	return (
@@ -77,11 +111,9 @@ export default function SubmitButton({
 				/>
 				<p>In Stock:&nbsp;{numberInStock}</p>
 			</div>
-			{/* <button type="submit" className="btn btn-primary bg-cyan-500"> */}
-			<Button type="submit" size={'sm'} className="max-w-56">
-				Add to Cart
+			<Button type="submit" size={'sm'} className="max-w-56" disabled={pending}>
+				{pending ? 'Adding\u2026' : 'Add to Cart'}
 			</Button>
-			{/* </button> */}
 		</form>
 	);
 }

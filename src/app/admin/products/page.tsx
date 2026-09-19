@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { getProducts, ProductProps } from '@/db/product-db';
 import Link from 'next/link';
 import { columns } from './_components/columns';
-import { ProductTable } from './_components/product-table';
+import { DataTable } from '@/components/data-table';
 import { Card } from '@/components/ui/card';
 
 export default async function AdminProductsPage() {
@@ -22,7 +22,12 @@ export default async function AdminProductsPage() {
 				</h2>
 			) : (
 				<Card className="p-2 shadow-warm-sm">
-					<ProductTable columns={columns} data={products} />
+					<DataTable
+						columns={columns}
+						data={products}
+						searchColumns={['name', 'category.name']}
+						searchPlaceholder="Search by name or category"
+					/>
 				</Card>
 			)}
 		</main>

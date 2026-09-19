@@ -3,6 +3,7 @@ import { PrismaAdapter } from '@lucia-auth/adapter-prisma';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import db from '../db/db';
+import { getCartIdByUserId } from '@/db/cart-db';
 
 const adapter = new PrismaAdapter(db.session, db.user);
 
@@ -107,6 +108,17 @@ export const assertAdminOrThrow = async () => {
 	}
 
 	return result;
+};
+
+// resolve the current visitor's cart id: 'guest' when signed out, the DB cart id otherwise
+export const getCartIdForSession = async () => {
+	const { user } = await verifyAuthSession();
+
+	if (user == null) {
+		return 'guest';
+	}
+
+	return ((await getCartIdByUserId(user.id)) as string) ?? 'guest';
 };
 
 export const destroyAuthSession = async () => {

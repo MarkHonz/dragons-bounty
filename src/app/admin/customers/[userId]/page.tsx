@@ -146,8 +146,20 @@ async function UserOrders({ profileId }: { profileId: string }) {
 							</TableCell>
 							<TableCell>{formatCurrency(order.totalInCents / 100)}</TableCell>
 							<TableCell>
-								<Badge variant={order.fulfilled ? 'secondary' : 'outline'}>
-									{order.fulfilled ? 'Fulfilled' : 'Pending'}
+								<Badge
+									variant={
+										order.refundedAt
+											? 'destructive'
+											: order.fulfilled
+												? 'secondary'
+												: 'outline'
+									}
+								>
+									{order.refundedAt
+										? 'Refunded'
+										: order.fulfilled
+											? 'Fulfilled'
+											: 'Pending'}
 								</Badge>
 							</TableCell>
 						</TableRow>

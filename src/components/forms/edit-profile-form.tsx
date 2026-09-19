@@ -82,11 +82,11 @@ export default function EditProfileForm({
 					name="name"
 					render={({ field }) => (
 						<FormItem>
-							<FormMessage />
+							<FormLabel className="pl-2">Name</FormLabel>
 							<FormControl>
 								<Input placeholder="name" type="text" {...field} />
 							</FormControl>
-							<FormLabel className="pl-2">Name</FormLabel>
+							<FormMessage />
 						</FormItem>
 					)}
 				/>
@@ -95,11 +95,11 @@ export default function EditProfileForm({
 					name="address1"
 					render={({ field }) => (
 						<FormItem>
-							<FormMessage />
+							<FormLabel className="pl-2">Address 1</FormLabel>
 							<FormControl>
 								<Input placeholder="address1" type="text" {...field} />
 							</FormControl>
-							<FormLabel className="pl-2">Address 1</FormLabel>
+							<FormMessage />
 						</FormItem>
 					)}
 				/>
@@ -108,11 +108,11 @@ export default function EditProfileForm({
 					name="address2"
 					render={({ field }) => (
 						<FormItem>
-							<FormMessage />
+							<FormLabel className="pl-2">Address 2</FormLabel>
 							<FormControl>
 								<Input placeholder="address2" type="text" {...field} />
 							</FormControl>
-							<FormLabel className="pl-2">Address 2</FormLabel>
+							<FormMessage />
 						</FormItem>
 					)}
 				/>
@@ -121,11 +121,11 @@ export default function EditProfileForm({
 					name="city"
 					render={({ field }) => (
 						<FormItem>
-							<FormMessage />
+							<FormLabel className="pl-2">City</FormLabel>
 							<FormControl>
 								<Input placeholder="city" type="text" {...field} />
 							</FormControl>
-							<FormLabel className="pl-2">City</FormLabel>
+							<FormMessage />
 						</FormItem>
 					)}
 				/>
@@ -134,11 +134,11 @@ export default function EditProfileForm({
 					name="state"
 					render={({ field }) => (
 						<FormItem>
-							<FormMessage />
+							<FormLabel className="pl-2">State</FormLabel>
 							<FormControl>
 								<Input placeholder="state" type="text" {...field} />
 							</FormControl>
-							<FormLabel className="pl-2">State</FormLabel>
+							<FormMessage />
 						</FormItem>
 					)}
 				/>
@@ -147,11 +147,11 @@ export default function EditProfileForm({
 					name="zip"
 					render={({ field }) => (
 						<FormItem>
-							<FormMessage />
+							<FormLabel className="pl-2">Zip Code</FormLabel>
 							<FormControl>
 								<Input placeholder="zip" type="text" {...field} />
 							</FormControl>
-							<FormLabel className="pl-2">Zip Code</FormLabel>
+							<FormMessage />
 						</FormItem>
 					)}
 				/>

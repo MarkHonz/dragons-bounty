@@ -13,18 +13,79 @@ import { assertAdminOrThrow } from '@/lib/auth';
 import {
 	createProduct,
 	deleteProduct,
+	getProductById,
 	getProductQuantityById,
+	ProductProps,
 	toggleProductAvailable,
-	updateProduct,
+	updateProductWithImages,
 } from '@/db/product-db';
+import { MAX_PRODUCT_IMAGES, validateImageFile } from '@/lib/product-images';
+import { parsePriceToCents } from '@/lib/formatters';
 
 const s3Client = new S3Client({
 	region: process.env.NEXT_AWS_S3_REGION!,
+	endpoint: process.env.NEXT_AWS_S3_ENDPOINT,
 	credentials: {
 		accessKeyId: process.env.NEXT_AWS_S3_ACCESS_KEY_ID!,
 		secretAccessKey: process.env.NEXT_AWS_S3_SECRET_ACCESS_KEY!,
 	},
 });
+
+const deleteObjects = async (keys: string[]) => {
+	await Promise.all(
+		keys.map(async (key) => {
+			try {
+				await s3Client.send(
+					new DeleteObjectCommand({
+						Bucket: process.env.NEXT_AWS_S3_BUCKET!,
+						Key: key,
+					})
+				);
+			} catch (error) {
+				console.error('Failed to delete product image', key, error);
+			}
+		})
+	);
+};
+
+// returns an error message, or null when every entry is an acceptable image
+const validateImages = (files: unknown[]) => {
+	for (const file of files) {
+		if (!(file instanceof File)) {
+			return 'Invalid image';
+		}
+		const error = validateImageFile(file);
+		if (error) {
+			return error;
+		}
+	}
+	return null;
+};
+
+// uploads every file; if one fails, the ones already uploaded are removed again
+const uploadImages = async (files: File[], name: string) => {
+	const slug = slugify(name, { lower: true, strict: true }) || 'product';
+	const keys: string[] = [];
+	try {
+		for (let index = 0; index < files.length; index++) {
+			const file = files[index];
+			const key = `${slug}-${Date.now()}-${index}`;
+			await s3Client.send(
+				new PutObjectCommand({
+					Bucket: process.env.NEXT_AWS_S3_BUCKET!,
+					Key: key,
+					Body: Buffer.from(await file.arrayBuffer()),
+					ContentType: file.type,
+				})
+			);
+			keys.push(key);
+		}
+		return keys;
+	} catch (error) {
+		await deleteObjects(keys);
+		throw error;
+	}
+};
 
 export const productSubmit = async (
 	previousState: object,
@@ -33,11 +94,11 @@ export const productSubmit = async (
 	await assertAdminOrThrow();
 
 	const name = formData.get('name') as string | null;
-	let priceInCents = formData.get('priceInCents') as string | number | null;
+	const price = formData.get('price') as string | null;
 	const description = formData.get('description') as string | null;
 	let quantity = formData.get('quantity') as string | number | null;
 	const categoryId = formData.get('categoryId') as string | null;
-	const image = formData.get('image') as File | null;
+	const images = formData.getAll('images');
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -46,14 +107,13 @@ export const productSubmit = async (
 	// Create a schema for the form data
 	const schema = z.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-		priceInCents: z.string().min(1, { message: 'Price must be at least 1' }),
+		price: z.string().min(1, { message: 'Price is required' }),
 		description: z
 			.string()
 			.min(2, { message: 'Description must be at least 2 characters' }),
 		categoryId: z
 			.string()
 			.min(2, { message: 'Category must be at least 2 characters' }),
-		image: z.any(),
 		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
 	});
 
@@ -61,10 +121,9 @@ export const productSubmit = async (
 		// Validate the form data
 		schema.parse({
 			name,
-			priceInCents,
+			price,
 			description,
 			categoryId,
-			image,
 			quantity,
 		});
 	} catch (error) {
@@ -75,7 +134,7 @@ export const productSubmit = async (
 		return response;
 	}
 
-	priceInCents = parseInt(priceInCents as string, 10);
+	const priceInCents = parsePriceToCents(price as string);
 	quantity = parseInt(quantity as string, 10);
 
 	// Check if the name is a string
@@ -84,8 +143,8 @@ export const productSubmit = async (
 		return response;
 	}
 
-	if (typeof priceInCents !== 'number') {
-		response.errors.push('Invalid price');
+	if (priceInCents === null) {
+		response.errors.push('Enter a price like 29.99');
 		return response;
 	}
 
@@ -104,32 +163,43 @@ export const productSubmit = async (
 		return response;
 	}
 
-	if (!(image instanceof File)) {
-		response.errors.push('Invalid image');
+	if (images.length < 1 || images.length > MAX_PRODUCT_IMAGES) {
+		response.errors.push(
+			`A product needs between 1 and ${MAX_PRODUCT_IMAGES} images`
+		);
 		return response;
 	}
 
-	const nameSlug = slugify(name, { lower: true });
+	const imageError = validateImages(images);
+	if (imageError) {
+		response.errors.push(imageError);
+		return response;
+	}
 
-	//Upload the image to S3
-	const imageKey = `${nameSlug}-${Date.now()}`;
-	const imageParams = {
-		Bucket: process.env.NEXT_AWS_S3_BUCKET!,
-		Key: imageKey,
-		Body: Buffer.from(await image.arrayBuffer()),
-		ContentType: image.type,
-	};
-	await s3Client.send(new PutObjectCommand(imageParams));
+	// Upload the images to the bucket
+	let imageKeys: string[];
+	try {
+		imageKeys = await uploadImages(images as File[], name);
+	} catch (error) {
+		console.error('Failed to upload product images', error);
+		response.errors.push('Failed to upload the images');
+		return response;
+	}
 
-	// Create the product
-	await createProduct({
+	// Create the product; if that fails, don't leave the uploads orphaned
+	const created = await createProduct({
 		name,
 		priceInCents,
 		description,
 		categoryId,
-		imagePath: imageKey,
+		imagePaths: imageKeys,
 		quantity,
 	});
+	if (created instanceof Error) {
+		await deleteObjects(imageKeys);
+		response.errors.push('Failed to create the product');
+		return response;
+	}
 
 	// Revalidate the product page
 	revalidatePath(`/products`, 'layout');
@@ -138,7 +208,7 @@ export const productSubmit = async (
 	return response;
 };
 
-export const productDelete = async (id: string, imagePath: string) => {
+export const productDelete = async (id: string) => {
 	await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
@@ -146,19 +216,29 @@ export const productDelete = async (id: string, imagePath: string) => {
 		success: false,
 	};
 
-	if (imagePath !== '') {
-		// Remove image from S3
-		const imageParams = {
-			Bucket: process.env.NEXT_AWS_S3_BUCKET!,
-			Key: imagePath,
-		};
-		await s3Client.send(new DeleteObjectCommand(imageParams));
+	// look the images up here rather than trusting the client; the rows are
+	// removed with the product, so they have to be read first
+	const existing = await getProductById(id);
+	const imageKeys =
+		existing && !(existing instanceof Error)
+			? (existing as ProductProps).images.map((image) => image.path)
+			: [];
+
+	// Delete the product first; only remove its images once that has succeeded
+	const deleted = await deleteProduct(id);
+	if (deleted instanceof Error) {
+		// P2003: a foreign key (order history) still points at this product
+		response.errors.push(
+			(deleted as { code?: string }).code === 'P2003'
+				? "This product is on existing orders and can't be deleted. Mark it unavailable instead."
+				: 'Failed to delete the product.'
+		);
+		return response;
 	}
 
-	// Delete the product
-	(await deleteProduct(id)) as { id: string };
+	await deleteObjects(imageKeys);
 
-	revalidatePath(`/product`, 'layout');
+	revalidatePath(`/products`, 'layout');
 	response.success = true;
 	return response;
 };
@@ -185,13 +265,13 @@ export const productUpdate = async (
 	await assertAdminOrThrow();
 
 	const name = formData.get('name') as string | null;
-	let priceInCents = formData.get('priceInCents') as string | number | null;
+	const price = formData.get('price') as string | null;
 	const description = formData.get('description') as string | null;
 	const categoryId = formData.get('categoryId') as string | null;
 	const id = formData.get('id') as string | null;
 	let quantity = formData.get('quantity') as string | number | null;
-	const image = formData.get('image') as File | null;
-	const previousImage = formData.get('imagePath') as string | null;
+	const keepImages = formData.get('keepImages') as string | null;
+	const newImages = formData.getAll('newImages');
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
@@ -200,7 +280,7 @@ export const productUpdate = async (
 	// Create a schema for the form data
 	const schema = z.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-		priceInCents: z.string().min(1, { message: 'Price must be at least 1' }),
+		price: z.string().min(1, { message: 'Price is required' }),
 		description: z
 			.string()
 			.min(2, { message: 'Description must be at least 2 characters' }),
@@ -208,22 +288,20 @@ export const productUpdate = async (
 			.string()
 			.min(2, { message: 'Category must be at least 2 characters' }),
 		id: z.string().min(2, { message: 'Id must be at least 2 characters' }),
-		image: z.any(),
 		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
-		previousImage: z.string(),
+		keepImages: z.string(),
 	});
 
 	try {
 		// Validate the form data
 		schema.parse({
 			name,
-			priceInCents,
+			price,
 			description,
 			categoryId,
 			id,
-			image,
 			quantity,
-			previousImage,
+			keepImages,
 		});
 	} catch (error) {
 		const { errors } = error as z.ZodError;
@@ -233,7 +311,7 @@ export const productUpdate = async (
 		return response;
 	}
 
-	priceInCents = parseInt(priceInCents as string, 10);
+	const priceInCents = parsePriceToCents(price as string);
 	quantity = parseInt(quantity as string, 10);
 
 	// Check if the name is a string
@@ -242,8 +320,8 @@ export const productUpdate = async (
 		return response;
 	}
 
-	if (typeof priceInCents !== 'number') {
-		response.errors.push('Invalid price');
+	if (priceInCents === null) {
+		response.errors.push('Enter a price like 29.99');
 		return response;
 	}
 
@@ -267,58 +345,83 @@ export const productUpdate = async (
 		return response;
 	}
 
-	if (!(image instanceof File)) {
-		response.errors.push('Invalid image');
+	// the images to keep, in their new order
+	let keepPaths: string[];
+	try {
+		const parsed = JSON.parse(keepImages as string);
+		if (
+			!Array.isArray(parsed) ||
+			!parsed.every((path) => typeof path === 'string') ||
+			new Set(parsed).size !== parsed.length
+		) {
+			throw new Error('bad keepImages');
+		}
+		keepPaths = parsed;
+	} catch {
+		response.errors.push('Invalid image list');
 		return response;
 	}
 
-	if (typeof previousImage !== 'string') {
-		response.errors.push('Invalid previous image');
+	// only images that already belong to this product can be kept
+	const existing = await getProductById(id);
+	if (!existing || existing instanceof Error) {
+		response.errors.push('Product not found');
+		return response;
+	}
+	const currentPaths = (existing as ProductProps).images.map(
+		(image) => image.path
+	);
+	if (!keepPaths.every((path) => currentPaths.includes(path))) {
+		response.errors.push('Invalid image list');
 		return response;
 	}
 
-	const nameSlug = slugify(name, { lower: true });
-
-	//Upload the image to S3
-	const imageKey = `${nameSlug}-${Date.now()}`;
-
-	// Check if the image has changed
-	if (previousImage !== imageKey) {
-		// Create the upload image params
-		const UploadImageParams = {
-			Bucket: process.env.NEXT_AWS_S3_BUCKET!,
-			Key: imageKey,
-			Body: Buffer.from(await image.arrayBuffer()),
-			ContentType: image.type,
-		};
-		// Create the delete image params
-		const DeleteImageParams = {
-			Bucket: process.env.NEXT_AWS_S3_BUCKET!,
-			Key: previousImage,
-		};
-		// Add the image to S3
-		await s3Client.send(new PutObjectCommand(UploadImageParams));
-		// Remove previous image from S3
-		await s3Client.send(new DeleteObjectCommand(DeleteImageParams));
+	const total = keepPaths.length + newImages.length;
+	if (total < 1 || total > MAX_PRODUCT_IMAGES) {
+		response.errors.push(
+			`A product needs between 1 and ${MAX_PRODUCT_IMAGES} images`
+		);
+		return response;
 	}
 
-	const data = {
+	const imageError = validateImages(newImages);
+	if (imageError) {
+		response.errors.push(imageError);
+		return response;
+	}
+
+	let addedPaths: string[];
+	try {
+		addedPaths = await uploadImages(newImages as File[], name);
+	} catch (error) {
+		console.error('Failed to upload product images', error);
+		response.errors.push('Failed to upload the images');
+		return response;
+	}
+
+	// Update the product; if that fails, don't leave the new uploads orphaned
+	const updated = await updateProductWithImages(
 		id,
-		name,
-		priceInCents,
-		description,
-		categoryId,
-		quantity,
-		imagePath: imageKey,
-	};
+		{ name, priceInCents, description, categoryId, quantity },
+		keepPaths,
+		addedPaths
+	);
+	if (updated instanceof Error) {
+		await deleteObjects(addedPaths);
+		response.errors.push('Failed to update the product');
+		return response;
+	}
 
-	// Update the product
-	await updateProduct(id, data);
+	// only now remove the images that were taken off the product
+	await deleteObjects(currentPaths.filter((path) => !keepPaths.includes(path)));
 
 	// Revalidate the product page
 	revalidatePath(`/products`, 'layout');
 	revalidatePath(`/products/${id}`, 'layout');
 	revalidatePath(`/products/${id}/edit`, 'layout');
+
+	response.success = true;
+	return response;
 };
 
 //function to get the quantity of a product in stock

@@ -86,10 +86,10 @@ export default function CreateUserForm() {
 								render={({ field }) => {
 									return (
 										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Name</FormLabel>
 											<FormControl>
 												<Input placeholder="username" type="text" {...field} />
 											</FormControl>
-											<FormLabel className="p-2">Name</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);
@@ -101,6 +101,7 @@ export default function CreateUserForm() {
 								render={({ field }) => {
 									return (
 										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Email</FormLabel>
 											<FormControl>
 												<Input
 													placeholder="email address"
@@ -108,7 +109,6 @@ export default function CreateUserForm() {
 													{...field}
 												/>
 											</FormControl>
-											<FormLabel className="p-2">Email</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);
@@ -120,6 +120,7 @@ export default function CreateUserForm() {
 								render={({ field }) => {
 									return (
 										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Password</FormLabel>
 											<FormControl>
 												<Input
 													placeholder="password"
@@ -127,7 +128,6 @@ export default function CreateUserForm() {
 													{...field}
 												/>
 											</FormControl>
-											<FormLabel className="p-2">Password</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);
@@ -139,6 +139,7 @@ export default function CreateUserForm() {
 								render={({ field }) => {
 									return (
 										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Confirm Password</FormLabel>
 											<FormControl>
 												<Input
 													placeholder="retype password"
@@ -146,7 +147,6 @@ export default function CreateUserForm() {
 													{...field}
 												/>
 											</FormControl>
-											<FormLabel className="p-2">Confirm Password</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);

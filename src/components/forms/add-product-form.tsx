@@ -21,42 +21,28 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { productSubmit } from '@/actions/product-actions';
 import { CategoryProps } from '@/db/category-db';
-
-const ACCEPTED_IMAGE_TYPES = [
-	'image/jpeg',
-	'image/jpg',
-	'image/png',
-	'image/webp',
-];
+import ProductImagesField, {
+	ProductImagesValue,
+} from '@/components/forms/product-images-field';
+import { MAX_PRODUCT_IMAGES } from '@/lib/product-images';
 
 const formSchema = z // create a schema for the form data
 	.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-		priceInCents: z.string().min(1, { message: 'Price must be at least 1' }),
+		price: z
+			.string()
+			.regex(/^\d+(\.\d{1,2})?$/, { message: 'Enter a price like 29.99' })
+			.refine((value) => Number(value) > 0, { message: 'Price must be more than 0' }),
 		description: z
 			.string()
 			.min(2, { message: 'Description must be at least 2 characters' }),
 		categoryId: z
 			.string()
 			.min(2, { message: 'Category must be at least 2 characters' }),
-		image: z
-			.any()
-			.refine(
-				(files) => {
-					return Array.from(files).every((file) => file instanceof File);
-				},
-				{ message: 'Please enter an image' }
-			)
-			.refine(
-				(files) =>
-					(Array.from(files) as File[]).every((file: File) =>
-						ACCEPTED_IMAGE_TYPES.includes(file.type)
-					),
-				'Only these types are allowed .jpg, .jpeg, .png and .webp'
-			),
 		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
 	});
 // infer the type of the form data
@@ -74,29 +60,43 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			name: '',
-			priceInCents: '',
+			price: '',
 			description: '',
 			categoryId: '',
-			image: '',
 			quantity: '',
 		},
 	});
+	const [images, setImages] = useState<ProductImagesValue>({
+		keep: [],
+		added: [],
+	});
+	const [imageError, setImageError] = useState('');
+	const [formError, setFormError] = useState('');
 	// create a submit handler
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
+		setFormError('');
+		if (images.added.length < 1 || images.added.length > MAX_PRODUCT_IMAGES) {
+			setImageError(`Add between 1 and ${MAX_PRODUCT_IMAGES} images`);
+			return;
+		}
+		setImageError('');
 		try {
 			const formData = new FormData();
 			formData.append('name', data.name);
-			formData.append('priceInCents', data.priceInCents);
+			formData.append('price', data.price);
 			formData.append('description', data.description);
 			formData.append('quantity', data.quantity);
 			formData.append('categoryId', data.categoryId);
-			formData.append('image', data.image[0]);
+			images.added.forEach((file) => formData.append('images', file));
 			const result = await productSubmit({}, formData);
 			if (result.success) {
 				router.push('/admin/products');
+			} else {
+				setFormError(result.errors.join('. '));
 			}
 		} catch (error) {
 			console.error('Failed to submit the form', error);
+			setFormError('Something went wrong while saving the product');
 		}
 	};
 	// return the form component
@@ -120,10 +120,10 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Name</FormLabel>
 									<FormControl>
 										<Input placeholder="product" type="text" {...field} />
 									</FormControl>
-									<FormLabel className="pl-2">Name</FormLabel>
 									<FormMessage />
 								</FormItem>
 							);
@@ -131,14 +131,20 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 					/>
 					<FormField
 						control={form.control}
-						name="priceInCents"
+						name="price"
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Price ($)</FormLabel>
 									<FormControl>
-										<Input placeholder="price" type="number" {...field} />
+										<Input
+												placeholder="29.99"
+												type="number"
+												step="0.01"
+												min="0.01"
+												{...field}
+											/>
 									</FormControl>
-									<FormLabel className="pl-2">Price</FormLabel>
 									<FormMessage />
 								</FormItem>
 							);
@@ -150,10 +156,10 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Description</FormLabel>
 									<FormControl>
 										<Input placeholder="description" type="text" {...field} />
 									</FormControl>
-									<FormLabel className="pl-2">Description</FormLabel>
 									<FormMessage />
 								</FormItem>
 							);
@@ -165,10 +171,10 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Quantity</FormLabel>
 									<FormControl>
 										<Input placeholder="quantity" type="number" {...field} />
 									</FormControl>
-									<FormLabel className="pl-2">Quantity</FormLabel>
 									<FormMessage />
 								</FormItem>
 							);
@@ -180,6 +186,7 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Category</FormLabel>
 									<Select
 										onValueChange={field.onChange}
 										defaultValue={field.value}
@@ -198,38 +205,23 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 											))}
 										</SelectContent>
 									</Select>
-									<FormLabel className="pl-2">Category</FormLabel>
 									<FormMessage />
 								</FormItem>
 							);
 						}}
 					/>
-					<FormField
-						control={form.control}
-						name="image"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input
-											type="file"
-											accept="image/png, image/jpeg, image/jpg, image/webp"
-											id="image"
-											onChange={(event) => {
-												const files = (event.target as HTMLInputElement).files;
-												if (files) {
-													field.onChange(files);
-												}
-											}}
-										/>
-									</FormControl>
-									<FormLabel className="pl-2">Select Image</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
+					<ProductImagesField
+						value={images}
+						onChange={(next) => {
+							setImages(next);
+							setImageError('');
 						}}
+						error={imageError}
 					/>
 				</fieldset>
+					{formError && (
+						<p className="text-sm font-medium text-destructive">{formError}</p>
+					)}
 					<Button type="submit" className="rounded-full">
 						Submit
 					</Button>

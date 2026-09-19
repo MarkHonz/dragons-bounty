@@ -13,6 +13,9 @@ import { verifyAuthSession } from '@/lib/auth';
 import { formatCurrency } from '@/lib/formatters';
 import Link from 'next/link';
 
+const orderStatus = (order: OrderProps) =>
+	order.refundedAt ? 'Refunded' : order.fulfilled ? 'Shipped' : 'Processing';
+
 export default async function OrdersPage() {
 	// get the authenticated user
 	const sessionUserId = await verifyAuthSession();
@@ -41,10 +44,33 @@ export default async function OrdersPage() {
 	}
 
 	return (
-		<main className="mx-auto flex max-w-lg flex-col items-center px-5 py-10 sm:px-10">
+		<main className="mx-auto flex max-w-3xl flex-col items-center px-5 py-10 sm:px-10">
 			<h1 className="mb-6 font-display text-3xl font-semibold">Orders</h1>
 			<Card className="w-full p-4 shadow-warm-sm sm:p-6">
-				<Table>
+				<div className="flex flex-col divide-y divide-border sm:hidden">
+					{orders.map((order: OrderProps) => (
+						<div key={order.id} className="flex flex-col gap-1 py-4">
+							<div className="flex items-center justify-between gap-3">
+								<span className="font-semibold">
+									{order.createdAt.toLocaleDateString()}
+								</span>
+								<span className="text-sm text-muted-foreground">
+									{orderStatus(order)}
+								</span>
+							</div>
+							<Link
+								href={`/orders/${order.id}`}
+								className="break-all text-sm text-primary underline"
+							>
+								{order.id}
+							</Link>
+							<span className="font-semibold">
+								{formatCurrency(order.totalInCents / 100)}
+							</span>
+						</div>
+					))}
+				</div>
+				<Table className="hidden sm:table">
 					<TableHeader>
 						<TableRow>
 							<TableHead>Order Date</TableHead>
@@ -55,8 +81,7 @@ export default async function OrdersPage() {
 					</TableHeader>
 					<TableBody>
 						{orders.map((order: OrderProps) => {
-							const orderFulfilled = order.fulfilled ? 'Shipped' : 'Processing';
-							return (
+														return (
 								<TableRow key={order.id}>
 									<TableCell>{order.createdAt.toLocaleDateString()}</TableCell>
 									<TableCell>
@@ -65,7 +90,7 @@ export default async function OrdersPage() {
 									<TableCell>
 										{formatCurrency(order.totalInCents / 100)}
 									</TableCell>
-									<TableCell>{orderFulfilled}</TableCell>
+									<TableCell>{orderStatus(order)}</TableCell>
 								</TableRow>
 							);
 						})}

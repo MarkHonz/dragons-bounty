@@ -3,6 +3,7 @@
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, SubmitHandler } from 'react-hook-form';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -26,37 +27,22 @@ import {
 import { productUpdate } from '@/actions/product-actions';
 import { ProductProps } from '@/db/product-db';
 import { CategoryProps } from '@/db/category-db';
-
-const ACCEPTED_IMAGE_TYPES = [
-	'image/jpeg',
-	'image/jpg',
-	'image/png',
-	'image/webp',
-];
+import ProductImagesField, {
+	ProductImagesValue,
+} from '@/components/forms/product-images-field';
+import { MAX_PRODUCT_IMAGES } from '@/lib/product-images';
 
 const formSchema = z // create a schema for the form data
 	.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-		priceInCents: z.string().min(1, { message: 'Price must be at least 1' }),
+		price: z
+			.string()
+			.regex(/^\d+(\.\d{1,2})?$/, { message: 'Enter a price like 29.99' })
+			.refine((value) => Number(value) > 0, { message: 'Price must be more than 0' }),
 		description: z
 			.string()
 			.min(2, { message: 'Description must be at least 2 characters' }),
 		categoryId: z.string(),
-		image: z
-			.any()
-			.refine(
-				(files) => {
-					return Array.from(files).every((file) => file instanceof File);
-				},
-				{ message: 'Please enter an image' }
-			)
-			.refine(
-				(files) =>
-					(Array.from(files) as File[]).every((file: File) =>
-						ACCEPTED_IMAGE_TYPES.includes(file.type)
-					),
-				'Only these types are allowed .jpg, .jpeg, .png and .webp'
-			),
 		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
 	});
 
@@ -76,33 +62,47 @@ export default function EditProductForm({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			name: product.name,
-			priceInCents: product.priceInCents.toString(),
+			price: (product.priceInCents / 100).toFixed(2),
 			description: product.description,
 			categoryId: product.categoryId,
-			image: product.imagePath,
 			quantity: product.quantity?.toString() ?? '1',
 		},
 	});
 
+	const [images, setImages] = useState<ProductImagesValue>({
+		keep: product.images.map((image) => image.path),
+		added: [],
+	});
+	const [imageError, setImageError] = useState('');
+	const [formError, setFormError] = useState('');
+
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
+		setFormError('');
+		const total = images.keep.length + images.added.length;
+		if (total < 1 || total > MAX_PRODUCT_IMAGES) {
+			setImageError(`A product needs between 1 and ${MAX_PRODUCT_IMAGES} images`);
+			return;
+		}
+		setImageError('');
 		try {
 			const formData = new FormData();
 			formData.append('id', product.id);
 			formData.append('name', data.name);
-			formData.append('priceInCents', data.priceInCents);
+			formData.append('price', data.price);
 			formData.append('description', data.description);
 			formData.append('categoryId', data.categoryId);
 			formData.append('quantity', data.quantity);
-			if (product.imagePath) {
-				formData.append('imagePath', product.imagePath);
+			formData.append('keepImages', JSON.stringify(images.keep));
+			images.added.forEach((file) => formData.append('newImages', file));
+			const result = await productUpdate({}, formData);
+			if (result.success) {
+				router.push('/admin/products');
+			} else {
+				setFormError(result.errors.join('. '));
 			}
-			if (data.image) {
-				formData.append('image', data.image[0]);
-			}
-			await productUpdate({}, formData);
-			router.push('/admin/products');
 		} catch (error) {
 			console.error('Failed to submit the form', error);
+			setFormError('Something went wrong while saving the product');
 		}
 	};
 
@@ -126,10 +126,10 @@ export default function EditProductForm({
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Name</FormLabel>
 									<FormControl>
-										<Input {...field} id="name" defaultValue={product.name} />
+										<Input {...field} defaultValue={product.name} />
 									</FormControl>
-									<FormLabel className="p-2">Name</FormLabel>
 									<FormMessage {...field} />
 								</FormItem>
 							);
@@ -137,19 +137,19 @@ export default function EditProductForm({
 					/>
 					<FormField
 						control={form.control}
-						name="priceInCents"
+						name="price"
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Price ($)</FormLabel>
 									<FormControl>
 										<Input
 											{...field}
-											id="priceInCents"
 											type="number"
-											defaultValue={product.priceInCents / 100}
+											step="0.01"
+											min="0.01"
 										/>
 									</FormControl>
-									<FormLabel className="p-2">Price</FormLabel>
 									<FormMessage {...field} />
 								</FormItem>
 							);
@@ -161,14 +161,13 @@ export default function EditProductForm({
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Description</FormLabel>
 									<FormControl>
 										<Input
 											{...field}
-											id="description"
 											defaultValue={product.description}
 										/>
 									</FormControl>
-									<FormLabel className="p-2">Description</FormLabel>
 									<FormMessage {...field} />
 								</FormItem>
 							);
@@ -180,15 +179,14 @@ export default function EditProductForm({
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Quantity</FormLabel>
 									<FormControl>
 										<Input
 											{...field}
-											id="quantity"
 											type="number"
 											defaultValue={product.quantity}
 										/>
 									</FormControl>
-									<FormLabel className="p-2">Quantity</FormLabel>
 									<FormMessage {...field} />
 								</FormItem>
 							);
@@ -200,6 +198,7 @@ export default function EditProductForm({
 						render={({ field }) => {
 							return (
 								<FormItem className="pb-2">
+									<FormLabel className="pl-2">Category</FormLabel>
 									<Select
 										onValueChange={field.onChange}
 										defaultValue={field.value}
@@ -221,38 +220,23 @@ export default function EditProductForm({
 											))}
 										</SelectContent>
 									</Select>
-									<FormLabel className="p-2">Category</FormLabel>
 									<FormMessage />
 								</FormItem>
 							);
 						}}
 					/>
-					<FormField
-						control={form.control}
-						name="image"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormControl>
-										<Input
-											type="file"
-											accept="image/png, image/jpeg, image/jpg, image/webp"
-											id="image"
-											onChange={(event) => {
-												const files = (event.target as HTMLInputElement).files;
-												if (files) {
-													field.onChange(files);
-												}
-											}}
-										/>
-									</FormControl>
-									<FormLabel className="pl-2">Select Image</FormLabel>
-									<FormMessage />
-								</FormItem>
-							);
+					<ProductImagesField
+						value={images}
+						onChange={(next) => {
+							setImages(next);
+							setImageError('');
 						}}
+						error={imageError}
 					/>
 				</fieldset>
+					{formError && (
+						<p className="text-sm font-medium text-destructive">{formError}</p>
+					)}
 					<Button type="submit" className="rounded-full">
 						Submit
 					</Button>

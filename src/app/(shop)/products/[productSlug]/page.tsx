@@ -1,8 +1,7 @@
-import Image from 'next/image';
-
 import { verifyAuthSession } from '@/lib/auth';
 import { formatCurrency } from '@/lib/formatters';
-import SubmitButton from './_components/submitButton';
+import AddToCartButton from '@/components/add-to-cart-button';
+import ProductImageCarousel from '@/components/product-image-carousel';
 import { getUserById } from '@/db/user-db';
 import { getProductById } from '@/db/product-db';
 import { ProductProps } from '@/db/product-db';
@@ -38,21 +37,13 @@ export default async function ProductDetailPage({ params }: Params) {
 	}
 	// console.log('user', user);
 
-	const imageUrl = process.env.NEXT_PUBLIC_S3_BASE_URL;
-
 	return (
 		<div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-10">
 			<Card className="grid grid-cols-1 gap-8 overflow-hidden p-6 shadow-warm-sm sm:grid-cols-2 sm:p-8">
-				<div className="flex items-center justify-center overflow-hidden rounded-2xl bg-muted">
-					<Image
-						src={`${imageUrl}${product.imagePath}`}
-						alt={'Image of ' + product.name}
-						width={400}
-						height={400}
-						className="h-auto w-full max-w-sm object-contain"
-						priority
-					/>
-				</div>
+				<ProductImageCarousel
+					paths={product.images.map((image) => image.path)}
+					name={product.name}
+				/>
 				<div className="flex flex-col gap-4">
 					<Badge className="w-fit">{product.category.name}</Badge>
 					<h1 className="font-display text-3xl font-semibold md:text-4xl">
@@ -64,7 +55,7 @@ export default async function ProductDetailPage({ params }: Params) {
 					<p className="text-2xl font-extrabold">
 						{formatCurrency(product.priceInCents / 100)}
 					</p>
-					<SubmitButton
+					<AddToCartButton
 						cartId={
 							user && user.profile.Cart !== null ? user.profile.Cart.id : 'guest'
 						}

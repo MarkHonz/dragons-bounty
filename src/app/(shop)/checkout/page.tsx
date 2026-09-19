@@ -91,69 +91,70 @@ export default async function CheckoutPage() {
 	}
 
 	return (
-		<main className="mx-auto flex max-w-xl flex-col gap-6 px-5 py-10 sm:px-10">
-			<h1 className="font-display text-3xl font-semibold">Checkout</h1>
-			<Card className="shadow-warm-sm">
-				<CardContent className="pt-6">
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Product</TableHead>
-								<TableHead>Quantity</TableHead>
-								<TableHead>Price</TableHead>
-								<TableHead>Total</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{cartItems.map(async (item) => {
-								if (item.product_id) {
-									const product = (await getProductById(
-										item.product_id
-									)) as ProductProps;
-									const total = product.priceInCents * (item.quantity ?? 0);
-									return (
-										<TableRow key={item.product_id}>
-											<TableCell>{product.name}</TableCell>
-											<TableCell className="text-center">
-												{item.quantity}
-											</TableCell>
-											<TableCell>
-												{formatCurrency(product.priceInCents / 100)}
-											</TableCell>
-											<TableCell>{formatCurrency(total / 100)}</TableCell>
-										</TableRow>
-									);
-								}
-								return null;
-							})}
-						</TableBody>
-					</Table>
-				</CardContent>
-				<CardFooter>
-					<div className="w-full">
-						<OrderTotals
-							rows={[
-								{ label: 'Cart Total', value: formatCurrency(cartTotal / 100) },
-								{
-									label: 'Shipping',
-									value: formatCurrency(shippingTotal / 100),
-								},
-								{ label: 'Tax', value: formatCurrency(taxTotal / 100) },
-								{
-									label: 'Order Total',
-									value: formatCurrency(orderTotal / 100),
-									emphasis: true,
-								},
-							]}
-						/>
-					</div>
-				</CardFooter>
-			</Card>
+		<main className="mx-auto max-w-5xl px-5 py-10 sm:px-10">
+			<h1 className="mb-6 font-display text-3xl font-semibold">Checkout</h1>
 			<AddAddressForm
 				clientSecret={paymentIntent.client_secret}
 				orderTotal={orderTotal}
 				user={authenticatedUser}
-			/>
+			>
+				<Card className="shadow-warm-sm">
+					<CardContent className="pt-6">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Product</TableHead>
+									<TableHead>Quantity</TableHead>
+									<TableHead>Price</TableHead>
+									<TableHead>Total</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{cartItems.map(async (item) => {
+									if (item.product_id) {
+										const product = (await getProductById(
+											item.product_id
+										)) as ProductProps;
+										const total = product.priceInCents * (item.quantity ?? 0);
+										return (
+											<TableRow key={item.product_id}>
+												<TableCell>{product.name}</TableCell>
+												<TableCell className="text-center">
+													{item.quantity}
+												</TableCell>
+												<TableCell>
+													{formatCurrency(product.priceInCents / 100)}
+												</TableCell>
+												<TableCell>{formatCurrency(total / 100)}</TableCell>
+											</TableRow>
+										);
+									}
+									return null;
+								})}
+							</TableBody>
+						</Table>
+					</CardContent>
+					<CardFooter>
+						<div className="w-full">
+							<OrderTotals
+								rows={[
+									{ label: 'Cart Total', value: formatCurrency(cartTotal / 100) },
+									{
+										label: 'Shipping',
+										value: formatCurrency(shippingTotal / 100),
+									},
+									{ label: 'Tax', value: formatCurrency(taxTotal / 100) },
+									{
+										label: 'Order Total',
+										value: formatCurrency(orderTotal / 100),
+										emphasis: true,
+									},
+								]}
+							/>
+						</div>
+					</CardFooter>
+				</Card>
+			</AddAddressForm>
 		</main>
 	);
 }

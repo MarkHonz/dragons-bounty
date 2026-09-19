@@ -30,8 +30,7 @@ export default function AdminHeader() {
 				<NavLink href="/admin/products">Products</NavLink>
 				<NavLink href="/admin/category">Categories</NavLink>
 				<NavLink href="/admin/customers">Customers</NavLink>
-				<NavLink href="/admin/orders">Sales</NavLink>
-				<NavLink href="/admin/photos">Photos</NavLink>
+				<NavLink href="/admin/orders">Orders</NavLink>
 			</Nav>
 		</header>
 	);

@@ -97,7 +97,20 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 					/>
 				</div>
 				<div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 text-sm text-muted-foreground">
-					<p>Status: {order.fulfilled ? 'Shipped' : 'Processing'}</p>
+					<p>
+						Status:{' '}
+						{order.refundedAt
+							? 'Refunded'
+							: order.fulfilled
+								? 'Shipped'
+								: 'Processing'}
+					</p>
+					{order.refundedAt && (
+						<p>
+							Refunded {formatCurrency((order.refundedAmountInCents ?? 0) / 100)}{' '}
+							on {order.refundedAt.toLocaleDateString()}
+						</p>
+					)}
 					<p>
 						Tracking number:{' '}
 						{order.trackingNumber ? order.trackingNumber : 'not available'}

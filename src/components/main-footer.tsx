@@ -28,7 +28,7 @@ export default function MainFooter() {
 						Shop
 					</div>
 					<div className="flex flex-col gap-2.5 text-sm font-semibold">
-						<Link href="/">All Products</Link>
+						<Link href="/#categories">All Products</Link>
 						<Link href="/#gallery">Gallery</Link>
 					</div>
 				</div>

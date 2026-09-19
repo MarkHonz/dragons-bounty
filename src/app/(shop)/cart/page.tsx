@@ -21,7 +21,7 @@ export default async function CartPage() {
 			: null;
 
 	return (
-		<main className="mx-auto flex max-w-xl flex-col items-center px-5 py-10 sm:px-10">
+		<main className="mx-auto flex max-w-3xl flex-col items-center px-5 py-10 sm:px-10">
 			<h1 className="mb-6 font-display text-3xl font-semibold">Your Cart</h1>
 			<Card className="w-full p-4 shadow-warm-sm sm:p-6">
 				<CartTable user={authenticatedUser} initialItems={initialItems} />

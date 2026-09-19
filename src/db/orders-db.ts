@@ -11,6 +11,9 @@ export type OrderProps = {
 	fulfilled?: boolean;
 	trackingNumber?: string;
 	stripePaymentIntentId?: string | null;
+	refundedAt?: Date | null;
+	refundedAmountInCents?: number | null;
+	stripeRefundId?: string | null;
 };
 
 export type OrderProductProps = {
@@ -107,7 +110,7 @@ export const getOrderDetails = async (orderId: string) => {
 // get all orders
 export const getOrders = async () => {
 	try {
-		return await db.order.findMany();
+		return await db.order.findMany({ orderBy: { createdAt: 'desc' } });
 	} catch (error) {
 		return error;
 	}
@@ -156,19 +159,6 @@ export const getOrderProducts = async () => {
 	}
 };
 
-// get unfulfilled orders
-export const getUnfulfilledOrders = async () => {
-	try {
-		return await db.order.findMany({
-			where: {
-				fulfilled: false,
-			},
-		});
-	} catch (error) {
-		return error;
-	}
-};
-
 // update an order's fulfillment status and/or tracking number
 export const updateOrderFulfillment = async (
 	orderId: string,
@@ -182,4 +172,72 @@ export const updateOrderFulfillment = async (
 	} catch (error) {
 		return error;
 	}
+};
+
+// Mark an order refunded, and optionally return its items to stock, in one
+// transaction. Resolves to false when someone else already recorded the refund,
+// so a double click or a replay can never restock twice. Unlike the helpers
+// above this one throws, so callers decide how to report a failure.
+//
+// A refund made through Stripe (`viaStripe`) may also match an order that the
+// charge.refunded webhook marked a moment earlier, because Stripe can deliver
+// that event before this transaction runs. Such an order has no stripeRefundId
+// yet, and this claims it so the refund id, restock and email still happen.
+export const markOrderRefunded = async (
+	orderId: string,
+	{
+		refundedAmountInCents,
+		stripeRefundId,
+		restock,
+		viaStripe,
+	}: {
+		refundedAmountInCents: number;
+		stripeRefundId: string | null;
+		restock: boolean;
+		viaStripe: boolean;
+	}
+) => {
+	return db.$transaction(async (tx) => {
+		const claimed = await tx.order.updateMany({
+			where: {
+				id: orderId,
+				...(viaStripe
+					? { OR: [{ refundedAt: null }, { stripeRefundId: null }] }
+					: { refundedAt: null }),
+			},
+			data: { refundedAt: new Date(), refundedAmountInCents, stripeRefundId },
+		});
+		if (claimed.count === 0) return false;
+
+		if (restock) {
+			const lines = await tx.order_Product.findMany({
+				where: { order_id: orderId },
+			});
+			for (const line of lines) {
+				// products without a stock number are not tracked, so leave them alone
+				await tx.product.updateMany({
+					where: { id: line.product_id, quantity: { not: null } },
+					data: { quantity: { increment: line.quantity } },
+				});
+			}
+		}
+		return true;
+	});
+};
+
+// Record a refund that happened outside the site (Stripe's charge.refunded
+// webhook). The amount is always stored; the order only becomes "Refunded" once
+// the charge is fully refunded. Does nothing for an order that is already
+// marked refunded, or for a payment intent we have no order for.
+export const recordStripeChargeRefund = async (
+	stripePaymentIntentId: string,
+	{ amountRefunded, fullyRefunded }: { amountRefunded: number; fullyRefunded: boolean }
+) => {
+	await db.order.updateMany({
+		where: { stripePaymentIntentId, refundedAt: null },
+		data: {
+			refundedAmountInCents: amountRefunded,
+			...(fullyRefunded ? { refundedAt: new Date() } : {}),
+		},
+	});
 };

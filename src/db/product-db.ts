@@ -1,11 +1,19 @@
 import db from '@/db/db';
 
+export type ProductImageProps = {
+	id: string;
+	path: string;
+	position: number;
+};
+
+const orderedImages = { orderBy: { position: 'asc' as const } };
+
 export type ProductProps = {
 	id: string;
 	name: string;
 	priceInCents: number;
 	description: string;
-	imagePath?: string;
+	images: ProductImageProps[];
 	categoryId: string;
 	isAvailable: boolean;
 	createdAt: Date;
@@ -17,31 +25,35 @@ export type ProductProps = {
 		createdAt: Date;
 		updatedAt: Date;
 	};
+	_count?: { Orders_Products: number };
 };
 
 export type CreateProductProps = {
 	name: string;
 	priceInCents: number;
 	description: string;
-	imagePath?: string;
+	imagePaths: string[];
 	categoryId: string;
 	quantity?: number;
 };
 
-export type UpdateProductProps = {
-	id: string;
+export type UpdateProductFields = {
 	name: string;
 	priceInCents: number;
 	description: string;
-	// imagePath?: string;
 	categoryId: string;
+	quantity?: number;
 };
+
+// the first image is the cover
+export const getCoverImage = (product: { images: { path: string }[] }) =>
+	product.images[0]?.path;
 
 export const createProduct = async ({
 	name,
 	priceInCents,
 	description,
-	imagePath,
+	imagePaths,
 	categoryId,
 	quantity,
 }: CreateProductProps) => {
@@ -51,9 +63,11 @@ export const createProduct = async ({
 				name,
 				priceInCents,
 				description,
-				imagePath,
 				categoryId,
 				quantity,
+				images: {
+					create: imagePaths.map((path, position) => ({ path, position })),
+				},
 			},
 		});
 	} catch (error) {
@@ -66,6 +80,8 @@ export const getProducts = async () => {
 		return await db.product.findMany({
 			include: {
 				category: true,
+				images: orderedImages,
+				_count: { select: { Orders_Products: true } },
 			},
 		});
 	} catch (error) {
@@ -81,6 +97,7 @@ export const getProductById = async (id: string) => {
 			},
 			include: {
 				category: true,
+				images: orderedImages,
 			},
 		});
 	} catch (error) {
@@ -115,13 +132,33 @@ export const toggleProductAvailable = async (id: string, isActive: boolean) => {
 	}
 };
 
-export const updateProduct = async (id: string, data: CreateProductProps) => {
+// keepPaths are the existing images to retain, in their new order; addedPaths
+// are newly uploaded and go after them. Anything else is removed.
+export const updateProductWithImages = async (
+	id: string,
+	data: UpdateProductFields,
+	keepPaths: string[],
+	addedPaths: string[]
+) => {
 	try {
-		return await db.product.update({
-			where: {
-				id,
-			},
-			data,
+		return await db.$transaction(async (tx) => {
+			await tx.productImage.deleteMany({
+				where: { productId: id, path: { notIn: keepPaths } },
+			});
+			for (let position = 0; position < keepPaths.length; position++) {
+				await tx.productImage.updateMany({
+					where: { productId: id, path: keepPaths[position] },
+					data: { position },
+				});
+			}
+			await tx.productImage.createMany({
+				data: addedPaths.map((path, i) => ({
+					productId: id,
+					path,
+					position: keepPaths.length + i,
+				})),
+			});
+			return tx.product.update({ where: { id }, data });
 		});
 	} catch (error) {
 		console.error('Failed to update the product', error);
@@ -137,6 +174,7 @@ export const getProductsByCategoryId = async (categoryId: string) => {
 			},
 			include: {
 				category: true,
+				images: orderedImages,
 			},
 			// fetch newest six products
 			take: 6,
@@ -159,6 +197,7 @@ export const getProductDetails = async (productIdArray: string[]) => {
 			},
 			include: {
 				category: true,
+				images: orderedImages,
 			},
 		});
 	} catch (error) {
@@ -174,6 +213,7 @@ export const getAvailableProducts = async () => {
 			},
 			include: {
 				category: true,
+				images: orderedImages,
 			},
 		});
 	} catch (error) {
@@ -190,8 +230,27 @@ export const getAvailableProductsByCategoryId = async (categoryId: string) =>
 		},
 		include: {
 			category: true,
+			images: orderedImages,
 		},
 	});
+
+// search available products by name or description
+export const searchAvailableProducts = async (query: string) => {
+	try {
+		return await db.product.findMany({
+			where: {
+				isAvailable: true,
+				OR: [{ name: { contains: query } }, { description: { contains: query } }],
+			},
+			include: {
+				category: true,
+				images: orderedImages,
+			},
+		});
+	} catch (error) {
+		return error;
+	}
+};
 
 // get product name by id
 export const getProductNameById = async (id: string) => {

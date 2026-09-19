@@ -49,6 +49,7 @@ type CheckoutFormProps = {
 	clientSecret: string;
 	orderTotal: number;
 	user: string;
+	children?: React.ReactNode;
 };
 
 const stripePromise = loadStripe(
@@ -59,6 +60,7 @@ export default function AddAddressForm({
 	clientSecret,
 	orderTotal,
 	user,
+	children,
 }: CheckoutFormProps) {
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -90,107 +92,118 @@ export default function AddAddressForm({
 	};
 
 	return (
-		<>
-			<Form {...form}>
-				<Card className="m-auto w-full max-w-md shadow-warm-sm">
-					<CardHeader>
-						<CardTitle className="text-center font-display text-2xl">
-							Shipping Address
-						</CardTitle>
-					</CardHeader>
-				<form
-					className="flex flex-col gap-2"
-					onSubmit={form.handleSubmit(handleSubmit)}
-				>
-					<CardContent className="flex flex-col gap-2">
-					<FormField
-						control={form.control}
-						name="address1"
-						render={({ field }) => {
-							return (
-								<FormItem>
-									<FormMessage />
-									<FormControl>
-										<Input placeholder="address1" type="text" {...field} />
-									</FormControl>
-									<FormLabel className="pl-2">Address 1</FormLabel>
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="address2"
-						render={({ field }) => {
-							return (
-								<FormItem>
-									<FormMessage />
-									<FormControl>
-										<Input placeholder="address2" type="text" {...field} />
-									</FormControl>
-									<FormLabel className="pl-2">Address 2</FormLabel>
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="city"
-						render={({ field }) => {
-							return (
-								<FormItem>
-									<FormMessage />
-									<FormControl>
-										<Input placeholder="city" type="text" {...field} />
-									</FormControl>
-									<FormLabel className="pl-2">City</FormLabel>
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="state"
-						render={({ field }) => {
-							return (
-								<FormItem>
-									<FormMessage />
-									<FormControl>
-										<Input placeholder="state" type="text" {...field} />
-									</FormControl>
-									<FormLabel className="pl-2">State</FormLabel>
-								</FormItem>
-							);
-						}}
-					/>
-					<FormField
-						control={form.control}
-						name="zip"
-						render={({ field }) => {
-							return (
-								<FormItem>
-									<FormMessage />
-									<FormControl>
-										<Input placeholder="zip" type="text" {...field} />
-									</FormControl>
-									<FormLabel className="pl-2">Zip Code</FormLabel>
-								</FormItem>
-							);
-						}}
-					/>
-					<Button type="submit" className="rounded-full">
-						Add Address
-					</Button>
-					</CardContent>
-				</form>
-				</Card>
-			</Form>
-			{responseState.success && (
-				<Elements options={{ clientSecret }} stripe={stripePromise}>
-					<StripeCheckoutForm orderTotal={orderTotal} />
-				</Elements>
-			)}
-		</>
+		<div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+			<div className="flex flex-col gap-6">
+				{children}
+				<Form {...form}>
+					<Card className="w-full shadow-warm-sm">
+						<CardHeader>
+							<CardTitle className="text-center font-display text-2xl">
+								Shipping Address
+							</CardTitle>
+						</CardHeader>
+					<form
+						className="flex flex-col gap-2"
+						onSubmit={form.handleSubmit(handleSubmit)}
+					>
+						<CardContent className="flex flex-col gap-2">
+						<FormField
+							control={form.control}
+							name="address1"
+							render={({ field }) => {
+								return (
+									<FormItem>
+										<FormLabel className="pl-2">Address 1</FormLabel>
+										<FormControl>
+											<Input placeholder="address1" type="text" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								);
+							}}
+						/>
+						<FormField
+							control={form.control}
+							name="address2"
+							render={({ field }) => {
+								return (
+									<FormItem>
+										<FormLabel className="pl-2">Address 2</FormLabel>
+										<FormControl>
+											<Input placeholder="address2" type="text" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								);
+							}}
+						/>
+						<FormField
+							control={form.control}
+							name="city"
+							render={({ field }) => {
+								return (
+									<FormItem>
+										<FormLabel className="pl-2">City</FormLabel>
+										<FormControl>
+											<Input placeholder="city" type="text" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								);
+							}}
+						/>
+						<FormField
+							control={form.control}
+							name="state"
+							render={({ field }) => {
+								return (
+									<FormItem>
+										<FormLabel className="pl-2">State</FormLabel>
+										<FormControl>
+											<Input placeholder="state" type="text" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								);
+							}}
+						/>
+						<FormField
+							control={form.control}
+							name="zip"
+							render={({ field }) => {
+								return (
+									<FormItem>
+										<FormLabel className="pl-2">Zip Code</FormLabel>
+										<FormControl>
+											<Input placeholder="zip" type="text" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								);
+							}}
+						/>
+						<Button type="submit" className="rounded-full">
+							Add Address
+						</Button>
+						</CardContent>
+					</form>
+					</Card>
+				</Form>
+			</div>
+			<div>
+				{responseState.success ? (
+					<Elements options={{ clientSecret }} stripe={stripePromise}>
+						<StripeCheckoutForm orderTotal={orderTotal} />
+					</Elements>
+				) : (
+					<Card className="w-full shadow-warm-sm">
+						<CardContent className="pt-6 text-center text-muted-foreground">
+							Add your shipping address to continue to payment.
+						</CardContent>
+					</Card>
+				)}
+			</div>
+		</div>
 	);
 }
 
@@ -243,7 +256,7 @@ function StripeCheckoutForm({ orderTotal }: StripeCheckoutFormProps) {
 
 	return (
 		<form onSubmit={handleSubmit}>
-			<Card className="mx-auto mt-3 w-full max-w-md shadow-warm-sm">
+			<Card className="w-full shadow-warm-sm">
 				<CardHeader>
 					<CardTitle className="font-display text-xl">
 						Payment Information

@@ -1,8 +1,10 @@
 import db from '@/db/db';
+import { generateVerificationToken } from '@/lib/tokens';
 
 export type UserProps = {
 	id: string;
 	email: string;
+	emailVerified: boolean;
 	password?: string | null;
 	profile: {
 		id: string;
@@ -105,20 +107,31 @@ export const getUsers = async () => {
 	});
 };
 
-// paginated users
-export const getUsersPaginated = async (page: number, perPage: number) => {
-	const skip = Math.max(0, (page - 1) * perPage);
-	const [users, total] = await Promise.all([
-		db.user.findMany({
-			include: { profile: { include: { Cart: true } } },
-			skip,
-			take: perPage,
-			orderBy: { createdAt: 'desc' },
-		}),
-		db.user.count(),
-	]);
+// Everything the admin customers table shows, and nothing more. This list is
+// handed to a client component, so it must never include the password hash.
+export type CustomerRow = {
+	id: string;
+	name: string | null;
+	email: string;
+	cartId: string | null;
+};
 
-	return { users, total };
+export const getCustomers = async (): Promise<CustomerRow[]> => {
+	const users = await db.user.findMany({
+		select: {
+			id: true,
+			email: true,
+			profile: { select: { name: true, Cart: { select: { id: true } } } },
+		},
+		orderBy: { createdAt: 'desc' },
+	});
+
+	return users.map((user) => ({
+		id: user.id,
+		name: user.profile?.name ?? null,
+		email: user.email,
+		cartId: user.profile?.Cart?.id ?? null,
+	}));
 };
 
 export const deleteUser = async (id: string) => {
@@ -214,4 +227,50 @@ export const getProfileNameById = async (id: string) => {
 		return profile.name;
 	}
 	return null;
+};
+
+// get the user (with profile) that owns a given profile id
+export const getUserByProfileId = async (profileId: string) => {
+	const profile = await db.profile.findUnique({
+		where: { id: profileId },
+		include: { user: true },
+	});
+	return profile?.user ?? null;
+};
+
+export const createVerificationToken = async (
+	userId: string,
+	type: string,
+	expiresAt: Date
+) => {
+	const verificationToken = await db.verificationToken.create({
+		data: { userId, type, token: generateVerificationToken(), expiresAt },
+	});
+	return verificationToken.token;
+};
+
+export const findVerificationToken = async (token: string) => {
+	return await db.verificationToken.findUnique({
+		where: { token },
+		include: { user: true },
+	});
+};
+
+export const deleteVerificationToken = async (id: string) => {
+	try {
+		return await db.verificationToken.delete({ where: { id } });
+	} catch (error) {
+		return error;
+	}
+};
+
+export const markUserEmailVerified = async (userId: string) => {
+	try {
+		return await db.user.update({
+			where: { id: userId },
+			data: { emailVerified: true },
+		});
+	} catch (error) {
+		return error;
+	}
 };

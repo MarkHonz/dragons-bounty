@@ -69,11 +69,11 @@ export default function AddCategoryForm() {
 								name="name"
 								render={({ field }) => {
 									return (
-										<FormItem>
+										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Name</FormLabel>
 											<FormControl>
 												<Input placeholder="category" type="text" {...field} />
 											</FormControl>
-											<FormLabel className="pl-2">Name</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);
@@ -84,11 +84,11 @@ export default function AddCategoryForm() {
 								name="description"
 								render={({ field }) => {
 									return (
-										<FormItem>
+										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Description</FormLabel>
 											<FormControl>
 												<Input placeholder="description" type="text" {...field} />
 											</FormControl>
-											<FormLabel className="pl-2">Description</FormLabel>
 											<FormMessage />
 										</FormItem>
 									);

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ import { AddressType, getAddressByProfileId } from '@/db/user-db';
 import { formatCurrency } from '@/lib/formatters';
 import { updateOrderFulfillmentAction } from '@/actions/order-actions';
 import OrderTotals from '@/components/order-totals';
+import RefundOrderForm from '../_components/refund-order-form';
 
 type OrderDetailsParams = {
 	params: {
@@ -48,11 +50,44 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 		order.id
 	)) as OrderProductProps[];
 
+	const isRefunded = Boolean(order.refundedAt);
+	const status = isRefunded
+		? 'Refunded'
+		: order.fulfilled
+			? 'Fulfilled'
+			: 'Processing';
+	const refundedAmount = formatCurrency((order.refundedAmountInCents ?? 0) / 100);
+
 	return (
 		<main className="mx-auto max-w-3xl">
-			<h1 className="mb-6 font-display text-3xl font-semibold">
+			<h1 className="mb-3 font-display text-3xl font-semibold">
 				Order Details
 			</h1>
+			<div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+				<Badge
+					variant={
+						isRefunded ? 'destructive' : order.fulfilled ? 'secondary' : 'outline'
+					}
+				>
+					{status}
+				</Badge>
+				{isRefunded ? (
+					<span className="text-muted-foreground">
+						{refundedAmount} refunded on{' '}
+						{new Date(order.refundedAt as Date).toLocaleDateString()}{' '}
+						{order.stripePaymentIntentId
+							? 'through Stripe'
+							: '(marked refunded by hand; no money moved through the site)'}
+					</span>
+				) : (
+					order.refundedAmountInCents ? (
+						<span className="text-muted-foreground">
+							{refundedAmount} of {formatCurrency(order.totalInCents / 100)}{' '}
+							refunded in Stripe
+						</span>
+					) : null
+				)}
+			</div>
 			<div className="flex flex-col items-start gap-6 md:flex-row">
 				<Card className="w-full flex-1 p-4 shadow-warm-sm sm:p-6">
 					<Table>
@@ -111,28 +146,41 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 							]}
 						/>
 					</div>
-					<form
-						action={updateOrderFulfillmentAction}
-						className="mt-4 flex w-full flex-col items-start gap-3 border-t border-border pt-4"
-					>
-						<input type="hidden" name="orderId" value={order.id} />
-						<label className="flex items-center gap-2 text-sm font-semibold">
-							<Checkbox name="fulfilled" defaultChecked={order.fulfilled} />
-							Fulfilled
-						</label>
-						<div className="flex w-full flex-col gap-1.5">
-							<Label htmlFor="trackingNumber">Tracking number</Label>
-							<Input
-								id="trackingNumber"
-								type="text"
-								name="trackingNumber"
-								defaultValue={order.trackingNumber ?? ''}
+					{!isRefunded && (
+						<form
+							action={updateOrderFulfillmentAction}
+							className="mt-4 flex w-full flex-col items-start gap-3 border-t border-border pt-4"
+						>
+							<input type="hidden" name="orderId" value={order.id} />
+							<label className="flex items-center gap-2 text-sm font-semibold">
+								<Checkbox name="fulfilled" defaultChecked={order.fulfilled} />
+								Fulfilled
+							</label>
+							<div className="flex w-full flex-col gap-1.5">
+								<Label htmlFor="trackingNumber">Tracking number</Label>
+								<Input
+									id="trackingNumber"
+									type="text"
+									name="trackingNumber"
+									defaultValue={order.trackingNumber ?? ''}
+								/>
+							</div>
+							<Button type="submit" className="rounded-full">
+								Save
+							</Button>
+						</form>
+					)}
+					{!isRefunded && (
+						<div className="mt-4 flex w-full flex-col gap-3 border-t border-border pt-4">
+							<h2 className="font-display text-lg font-semibold">Refund</h2>
+							<RefundOrderForm
+								orderId={order.id}
+								totalInCents={order.totalInCents}
+								hasStripePayment={Boolean(order.stripePaymentIntentId)}
+								shipped={Boolean(order.fulfilled)}
 							/>
 						</div>
-						<Button type="submit" className="rounded-full">
-							Save
-						</Button>
-					</form>
+					)}
 				</Card>
 				<Card className="w-full shadow-warm-sm md:w-72">
 					<CardHeader>

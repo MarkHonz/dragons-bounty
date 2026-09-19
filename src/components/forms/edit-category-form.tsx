@@ -77,10 +77,10 @@ export default function EditCategoryForm({ category }: EditCategoryFormProps) {
 								render={({ field }) => {
 									return (
 										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Name</FormLabel>
 											<FormControl>
-												<Input {...field} id="name" defaultValue={category.name} />
+												<Input {...field} defaultValue={category.name} />
 											</FormControl>
-											<FormLabel className="p-2">Name</FormLabel>
 											<FormMessage {...field} />
 										</FormItem>
 									);
@@ -92,14 +92,13 @@ export default function EditCategoryForm({ category }: EditCategoryFormProps) {
 								render={({ field }) => {
 									return (
 										<FormItem className="pb-2">
+											<FormLabel className="pl-2">Description</FormLabel>
 											<FormControl>
 												<Input
 													{...field}
-													id="description"
 													defaultValue={category.description ?? ''}
 												/>
 											</FormControl>
-											<FormLabel className="p-2">Description</FormLabel>
 											<FormMessage {...field} />
 										</FormItem>
 									);

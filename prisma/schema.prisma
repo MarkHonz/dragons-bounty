@@ -11,14 +11,26 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  password  String
-  email     String    @unique
-  role      String    @default("USER") // This is a string attribute with a default value
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  profile   Profile? // This is a one-to-one relation
-  sessions  Session[] // This is a one-to-many relation (important!)
+  id                 String              @id @default(cuid())
+  password           String
+  email              String              @unique
+  emailVerified      Boolean             @default(false)
+  role               String              @default("USER") // This is a string attribute with a default value
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  profile            Profile? // This is a one-to-one relation
+  sessions           Session[] // This is a one-to-many relation (important!)
+  verificationTokens VerificationToken[] // This is a one-to-many relation
+}
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  type      String // e.g. "EMAIL_VERIFY"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
 }
 
 model Session {
@@ -54,6 +66,9 @@ model Order {
   trackingNumber       String?
   fulfilled            Boolean         @default(false)
   stripePaymentIntentId String?        @unique
+  refundedAt           DateTime? // set once the order is fully refunded
+  refundedAmountInCents Int?
+  stripeRefundId       String? // null on a refunded order means it was marked refunded manually
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   profile              Profile         @relation(fields: [profileId], references: [id], onDelete: Restrict) // This is a many-to-one relation
@@ -74,7 +89,6 @@ model Product {
   id              String          @id @default(cuid())
   name            String
   priceInCents    Int
-  imagePath       String?
   description     String
   quantity        Int?
   isAvailable     Boolean         @default(true)
@@ -84,6 +98,18 @@ model Product {
   categoryId      String          @map("catagoryId")
   Orders_Products Order_Product[] // This is a many-to-many relation
   Cart_Products   Cart_Product[] // This is a many-to-many relation
+  images          ProductImage[] // Position 0 is the cover image
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  path      String
+  position  Int
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  @@index([productId, position])
 }
 
 model Category {
@@ -119,13 +145,4 @@ model Cart_Product {
 
   @@id([cart_id, product_id])
   @@map("Cart_Products")
-}
-
-model Photo {
-  id        String   @id @default(cuid())
-  url       String
-  key       String? // optional S3 key
-  caption   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

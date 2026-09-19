@@ -2,17 +2,18 @@ import {
 	getAvailableProductsByCategoryId,
 	ProductProps,
 } from '@/db/product-db';
-import { CategoryProps } from '@/db/category-db';
+import { CategoryProps, findActiveCategories } from '@/db/category-db';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { getCategories } from '@/db/category-db';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
-import PhotoGallery from '@/components/photo-gallery';
+import ProductGallery from '@/components/product-gallery';
 import ProductCard from '@/components/product-card';
+import { getCartIdForSession } from '@/lib/auth';
 
 export default async function HomePage() {
-	const categories = (await getCategories()) as CategoryProps[];
+	const categories = (await findActiveCategories()) as CategoryProps[];
+	const cartId = await getCartIdForSession();
 
 	const categoryProducts = await Promise.all(
 		categories.map(async (category) => {
@@ -39,7 +40,7 @@ export default async function HomePage() {
 					</p>
 					<div className="mb-9 flex flex-wrap items-center gap-4">
 						<Link
-							href="#gallery"
+							href="#categories"
 							className="rounded-full bg-primary px-7 py-3.5 text-sm font-extrabold text-primary-foreground shadow-warm-md"
 						>
 							Shop the Hoard
@@ -84,7 +85,10 @@ export default async function HomePage() {
 				</div>
 			</section>
 
-			<div className="mx-auto flex max-w-[1320px] flex-wrap gap-3 px-5 pb-2 sm:px-10">
+			<div
+				id="categories"
+				className="mx-auto flex max-w-[1320px] scroll-mt-24 flex-wrap gap-3 px-5 pb-2 sm:px-10"
+			>
 				<Badge className="px-5 py-2 text-sm">All Goods</Badge>
 				{categories.map((category) => (
 					<Link key={category.id} href={`/category/${category.id}`}>
@@ -120,13 +124,13 @@ export default async function HomePage() {
 						{categoryProducts
 							.find((cp) => cp.categoryId === category.id)
 							?.products.map((product) => (
-								<ProductCard key={product.id} product={product} />
+								<ProductCard key={product.id} product={product} cartId={cartId} />
 							))}
 					</div>
 				</section>
 			))}
 
-			<PhotoGallery />
+			<ProductGallery />
 		</div>
 	);
 }

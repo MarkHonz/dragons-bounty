@@ -2,7 +2,6 @@
 
 import z from 'zod';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 import { assertAdminOrThrow } from '@/lib/auth';
 import {
@@ -74,12 +73,20 @@ export const categoryDelete = async (id: string) => {
 		success: false,
 	};
 
-	// Delete the category
-	(await deleteCategory(id)) as { id: string };
+	// Delete the category; deleteCategory returns errors rather than throwing them
+	const deleted = await deleteCategory(id);
+	if (deleted instanceof Error) {
+		// P2003: products still belong to this category
+		response.errors.push(
+			(deleted as { code?: string }).code === 'P2003'
+				? "This category still has products, so it can't be deleted. Move or delete them first."
+				: 'Failed to delete the category.'
+		);
+		return response;
+	}
 
-	// Redirect to the category page
-	redirect(`/admin/category`);
-
+	revalidatePath(`/admin/category`);
+	revalidatePath(`/category`, 'layout');
 	response.success = true;
 	return response;
 };

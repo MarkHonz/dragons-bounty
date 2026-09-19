@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
 	Sheet,
@@ -11,6 +11,7 @@ import {
 	SheetTrigger,
 } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
+import ThemeToggle from '@/components/theme-toggle';
 
 type NavItem = { href: string; label: string };
 
@@ -36,6 +37,13 @@ export default function MobileNav({ navItems, isSignedIn }: Props) {
 				<SheetHeader>
 					<SheetTitle className="font-display">Dragon&apos;s Bounty</SheetTitle>
 				</SheetHeader>
+				<Link
+					href="/search"
+					className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold text-foreground hover:bg-muted"
+				>
+					<Search className="h-4 w-4" />
+					Search
+				</Link>
 				<nav className="flex flex-col gap-1">
 					{navItems.map((item) => (
 						<Link
@@ -48,6 +56,10 @@ export default function MobileNav({ navItems, isSignedIn }: Props) {
 					))}
 				</nav>
 				<Separator />
+				<div className="flex items-center justify-between px-3">
+					<span className="text-base font-semibold text-foreground">Theme</span>
+					<ThemeToggle />
+				</div>
 				<Link
 					href="/sign-in"
 					className="rounded-md px-3 py-2 text-base font-semibold text-foreground hover:bg-muted"

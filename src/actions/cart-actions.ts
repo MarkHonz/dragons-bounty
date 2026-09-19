@@ -12,7 +12,11 @@ export const addToCart = async (previousState: object, formData: FormData) => {
 	const cartId = formData.get('cartId') as string | null;
 	const productId = formData.get('productId') as string | null;
 	let quantity = formData.get('quantity') as string | number | null;
-	const response: { errors: string[]; success: boolean } = {
+	const response: {
+		errors: string[];
+		success: boolean;
+		alreadyInCart?: boolean;
+	} = {
 		errors: [],
 		success: false,
 	};
@@ -61,16 +65,20 @@ export const addToCart = async (previousState: object, formData: FormData) => {
 		return response;
 	}
 
-	try {
-		// Add the product to the cart
-		await addItemToCart({
-			cartId: cartId as string,
-			productId: productId as string,
-			quantity: quantity as number,
-		});
-	} catch (error) {
-		console.error(error);
-		response.errors.push('An error occurred');
+	// Add the product to the cart. addItemToCart returns errors rather than
+	// throwing them; P2002 means this product is already in the cart.
+	const added = await addItemToCart({
+		cartId: cartId as string,
+		productId: productId as string,
+		quantity: quantity as number,
+	});
+	if (added instanceof Error) {
+		if ((added as { code?: string }).code === 'P2002') {
+			response.alreadyInCart = true;
+			response.errors.push('This item is already in your cart');
+		} else {
+			response.errors.push('An error occurred');
+		}
 		return response;
 	}
 

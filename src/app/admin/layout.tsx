@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: Props) {
 	return (
 		<>
 			<AdminHeader />
-			<div className="container my-8">{children}</div>
+			<div className="container mx-auto my-8 px-4">{children}</div>
 		</>
 	);
 }

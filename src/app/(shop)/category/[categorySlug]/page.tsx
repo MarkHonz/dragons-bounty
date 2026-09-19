@@ -6,6 +6,7 @@ import {
 } from '@/db/product-db';
 import { findCategoryById, CategoryProps } from '@/db/category-db';
 import ProductCard from '@/components/product-card';
+import { getCartIdForSession } from '@/lib/auth';
 
 type Params = {
 	params: {
@@ -24,6 +25,7 @@ export default async function CategoryPage({ params }: Params) {
 	const products = (await getAvailableProductsByCategoryId(
 		category.id
 	)) as ProductProps[];
+	const cartId = await getCartIdForSession();
 
 	return (
 		<section className="mx-auto max-w-[1320px] px-5 py-10 sm:px-10">
@@ -42,7 +44,7 @@ export default async function CategoryPage({ params }: Params) {
 			{products.length > 0 ? (
 				<div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 					{products.map((product) => (
-						<ProductCard key={product.id} product={product} />
+						<ProductCard key={product.id} product={product} cartId={cartId} />
 					))}
 				</div>
 			) : (

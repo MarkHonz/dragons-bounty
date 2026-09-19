@@ -7,8 +7,10 @@ import { redirect } from 'next/navigation';
 import {
 	addUserAddress,
 	createUser,
+	createVerificationToken,
 	deleteUser,
 	findUserByEmail,
+	getUserById,
 	updateUserProfile,
 } from '@/db/user-db';
 import { hashUserPassword, verifyPassword } from '@/lib/hash';
@@ -20,6 +22,9 @@ import {
 } from '@/lib/auth';
 import { addItemToCart, getCartById, getCartIdByUserId } from '@/db/cart-db';
 import { getProductById, ProductProps } from '@/db/product-db';
+import { sendVerificationEmail } from '@/lib/notifications';
+
+const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
 export const userSubmit = async (previousState: object, formData: FormData) => {
 	const name = formData.get('name') as string | null;
@@ -86,6 +91,22 @@ export const userSubmit = async (previousState: object, formData: FormData) => {
 		password: hashedPassword,
 	})) as { id: string }; // Add type assertion here
 	await createAuthSession(user.id); // Create a session for the user
+
+	// send a verification email; failures here must never block signup
+	try {
+		const token = await createVerificationToken(
+			user.id,
+			'EMAIL_VERIFY',
+			new Date(Date.now() + ONE_DAY_MS)
+		);
+		await sendVerificationEmail({
+			name,
+			email,
+			verifyUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/verify-email?token=${token}`,
+		});
+	} catch (error) {
+		console.error('Failed to send verification email', error);
+	}
 
 	console.log('cartItems:', cartItems);
 
@@ -404,4 +425,27 @@ export const userUpdateProfile = async (
 		response.errors.push('Error updating profile');
 		return response;
 	}
+};
+
+export const resendVerificationEmailAction = async () => {
+	const { user: sessionUser } = await verifyAuthSession();
+	if (sessionUser == null) {
+		return;
+	}
+
+	const user = await getUserById(sessionUser.id);
+	if (user == null || user.emailVerified) {
+		return;
+	}
+
+	const token = await createVerificationToken(
+		user.id,
+		'EMAIL_VERIFY',
+		new Date(Date.now() + ONE_DAY_MS)
+	);
+	await sendVerificationEmail({
+		name: user.profile?.name ?? 'there',
+		email: user.email,
+		verifyUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/verify-email?token=${token}`,
+	});
 };
