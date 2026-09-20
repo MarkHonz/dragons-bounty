@@ -20,6 +20,8 @@ type Props = {
 	// button text; defaults suit a delete
 	confirmLabel?: string;
 	pendingLabel?: string;
+	// red for deleting things, plain for everything else
+	confirmVariant?: 'default' | 'destructive';
 	// resolves to an error message to show, or null once it succeeded
 	onConfirm: () => Promise<string | null>;
 };
@@ -31,6 +33,7 @@ export default function ConfirmDeleteDialog({
 	description,
 	confirmLabel = 'Delete',
 	pendingLabel = 'Deleting…',
+	confirmVariant = 'destructive',
 	onConfirm,
 }: Props) {
 	const [pending, setPending] = useState(false);
@@ -79,7 +82,7 @@ export default function ConfirmDeleteDialog({
 					>
 						Cancel
 					</Button>
-					<Button variant="destructive" onClick={confirm} disabled={pending}>
+					<Button variant={confirmVariant} onClick={confirm} disabled={pending}>
 						{pending ? pendingLabel : confirmLabel}
 					</Button>
 				</DialogFooter>

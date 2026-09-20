@@ -114,6 +114,8 @@ export type CustomerRow = {
 	name: string | null;
 	email: string;
 	cartId: string | null;
+	role: string;
+	emailVerified: boolean;
 };
 
 export const getCustomers = async (): Promise<CustomerRow[]> => {
@@ -121,6 +123,8 @@ export const getCustomers = async (): Promise<CustomerRow[]> => {
 		select: {
 			id: true,
 			email: true,
+			role: true,
+			emailVerified: true,
 			profile: { select: { name: true, Cart: { select: { id: true } } } },
 		},
 		orderBy: { createdAt: 'desc' },
@@ -131,6 +135,116 @@ export const getCustomers = async (): Promise<CustomerRow[]> => {
 		name: user.profile?.name ?? null,
 		email: user.email,
 		cartId: user.profile?.Cart?.id ?? null,
+		role: user.role,
+		emailVerified: user.emailVerified,
+	}));
+};
+
+export type UserRole = 'ADMIN' | 'USER';
+
+export type ChangeRoleResult =
+	| 'changed'
+	| 'unchanged'
+	| 'not-found'
+	| 'unverified'
+	| 'last-admin';
+
+// Change a user's role. The checks, the update and the history entry run in one
+// transaction, so two admins removing each other at the same moment can't leave
+// the site with no admin, and a change can never happen without being recorded.
+//  - only an account with a verified email can become an admin
+//  - the last remaining admin can't be demoted
+// `actorId` is the admin making the change. Resolves to why nothing changed, or
+// 'changed'. Throws on a database error.
+export const changeUserRole = async (
+	id: string,
+	role: UserRole,
+	actorId: string
+): Promise<ChangeRoleResult> => {
+	return db.$transaction(async (tx) => {
+		const user = await tx.user.findUnique({
+			where: { id },
+			select: {
+				role: true,
+				emailVerified: true,
+				email: true,
+				profile: { select: { name: true } },
+			},
+		});
+		if (!user) return 'not-found';
+		if (user.role === role) return 'unchanged';
+		if (role === 'ADMIN' && !user.emailVerified) return 'unverified';
+		if (role === 'USER') {
+			const admins = await tx.user.count({ where: { role: 'ADMIN' } });
+			if (admins <= 1) return 'last-admin';
+		}
+		const actor = await tx.user.findUnique({
+			where: { id: actorId },
+			select: { email: true, profile: { select: { name: true } } },
+		});
+		if (!actor) throw new Error('The admin making the change no longer exists');
+
+		await tx.user.update({ where: { id }, data: { role } });
+		// emails and names are copied in so the history still reads correctly if
+		// either person is later renamed or deleted
+		await tx.roleChange.create({
+			data: {
+				fromRole: user.role,
+				toRole: role,
+				targetId: id,
+				targetEmail: user.email,
+				targetName: user.profile?.name ?? null,
+				actorId,
+				actorEmail: actor.email,
+				actorName: actor.profile?.name ?? null,
+			},
+		});
+		return 'changed';
+	});
+};
+
+export type RoleChangeRow = {
+	id: string;
+	createdAt: Date;
+	fromRole: string;
+	toRole: string;
+	// null once that account has been deleted
+	targetId: string | null;
+	targetEmail: string;
+	targetName: string | null;
+	actorEmail: string;
+	actorName: string | null;
+};
+
+// Every role change, newest first. Only what the history page shows leaves the
+// database: nothing else about the accounts.
+export const getRoleChanges = async (): Promise<RoleChangeRow[]> => {
+	return db.roleChange.findMany({
+		orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+		select: {
+			id: true,
+			createdAt: true,
+			fromRole: true,
+			toRole: true,
+			targetId: true,
+			targetEmail: true,
+			targetName: true,
+			actorEmail: true,
+			actorName: true,
+		},
+	});
+};
+
+// The admins other than the ones named, with what an email needs. Used to tell
+// the rest of the team when someone is made an admin.
+export const getOtherAdmins = async (excludeIds: string[]) => {
+	const admins = await db.user.findMany({
+		where: { role: 'ADMIN', id: { notIn: excludeIds } },
+		select: { email: true, profile: { select: { name: true } } },
+	});
+	return admins.map((admin) => ({
+		email: admin.email,
+		name: admin.profile?.name ?? null,
 	}));
 };
 

@@ -1,25 +1,36 @@
 import db from '@/db/db';
-import { getProductById, ProductProps } from '@/db/product-db';
+import { getPurchaseInfo } from '@/db/product-db';
 
 export type CartProps = {
 	id: string;
 	quantity: number;
 	cart_id: string;
 	product_id: string;
+	// "" when the product has no options
+	variant_id: string;
 };
 
 export type EnrichedCartItem = {
 	productId: string;
+	// "" when the product has no options
+	variantId: string;
 	name: string;
+	// the option's name, "" when the product has no options
+	variantName: string;
 	quantity: number;
 	price: number;
 	cartId: string;
-	numberInStock: number;
+	// null when stock isn't tracked
+	numberInStock: number | null;
+	// false when the product has been switched off (or its category has)
+	isAvailable: boolean;
 };
 
 type AddItemToCartProps = {
 	cartId: string;
 	productId: string;
+	// the chosen option; "" for a product without options
+	variantId?: string;
 	quantity: number;
 };
 
@@ -27,6 +38,7 @@ type AddItemToCartProps = {
 export const addItemToCart = async ({
 	cartId,
 	productId,
+	variantId = '',
 	quantity,
 }: AddItemToCartProps) => {
 	try {
@@ -35,6 +47,7 @@ export const addItemToCart = async ({
 				quantity,
 				cart_id: cartId,
 				product_id: productId,
+				variant_id: variantId,
 			},
 		});
 	} catch (error) {
@@ -58,12 +71,17 @@ export const getCartById = async (cartId: string) => {
 };
 
 // function to delete a product from the cart
-export const deleteCartItem = async (cartId: string, productId: string) => {
+export const deleteCartItem = async (
+	cartId: string,
+	productId: string,
+	variantId = ''
+) => {
 	try {
 		return await db.cart_Product.deleteMany({
 			where: {
 				cart_id: cartId,
 				product_id: productId,
+				variant_id: variantId,
 			},
 		});
 	} catch (error) {
@@ -76,14 +94,16 @@ export const deleteCartItem = async (cartId: string, productId: string) => {
 export const updateCartItemQuantity = async ({
 	cartId,
 	productId,
+	variantId = '',
 	quantity,
 }: AddItemToCartProps) => {
 	try {
 		return await db.cart_Product.update({
 			where: {
-				cart_id_product_id: {
+				cart_id_product_id_variant_id: {
 					cart_id: cartId,
 					product_id: productId,
+					variant_id: variantId,
 				},
 			},
 			data: {
@@ -128,23 +148,8 @@ export const getCartIdByUserId = async (userId: string) => {
 	}
 };
 
-// function to check if the product is already in the cart
-export const isProductInCart = async (cartId: string, productId: string) => {
-	try {
-		const product = await db.cart_Product.findFirst({
-			where: {
-				cart_id: cartId,
-				product_id: productId,
-			},
-		});
-		return product ? true : false;
-	} catch (error) {
-		console.error(error);
-		return error;
-	}
-};
-
-// function to get the DB cart for a user, enriched with product name/price/stock
+// function to get the DB cart for a user, enriched with product name, option,
+// price and stock
 export const getEnrichedCartByUserId = async (
 	userId: string
 ): Promise<{ cartId: string; items: EnrichedCartItem[] }> => {
@@ -156,37 +161,22 @@ export const getEnrichedCartByUserId = async (
 	const cartItems = (await getCartById(cartId)) as CartProps[];
 
 	const items = await Promise.all(
-		cartItems.map(async (item) => {
-			const product = (await getProductById(item.product_id)) as ProductProps;
+		cartItems.map(async (item): Promise<EnrichedCartItem> => {
+			// one answer for price, stock and whether the line can still be bought
+			const info = await getPurchaseInfo(item.product_id, item.variant_id);
 			return {
 				productId: item.product_id,
-				name: product.name,
+				variantId: item.variant_id,
+				name: info?.productName ?? 'Item no longer available',
+				variantName: info?.variantName ?? '',
 				quantity: item.quantity,
-				price: product.priceInCents,
+				price: info?.priceInCents ?? 0,
 				cartId,
-				numberInStock: product.quantity,
+				numberInStock: info ? info.quantity : 0,
+				isAvailable: info?.buyable ?? false,
 			};
 		})
 	);
 
 	return { cartId, items };
-};
-
-// function to get the quantity of a product in the cart
-export const getProductQuantityInCart = async (
-	cartId: string,
-	productId: string
-) => {
-	try {
-		const product = await db.cart_Product.findFirst({
-			where: {
-				cart_id: cartId,
-				product_id: productId,
-			},
-		});
-		return product?.quantity;
-	} catch (error) {
-		console.error(error);
-		return error;
-	}
 };

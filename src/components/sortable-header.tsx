@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 type Props<TData, TValue> = {
 	column: Column<TData, TValue>;
 	label: string;
+	// a shorter label for phones, where header space is tight
+	shortLabel?: string;
 	// which edge the column's content lines up with
 	align?: 'left' | 'center' | 'right';
 };
@@ -16,6 +18,7 @@ type Props<TData, TValue> = {
 export default function SortableHeader<TData, TValue>({
 	column,
 	label,
+	shortLabel,
 	align = 'left',
 }: Props<TData, TValue>) {
 	const sorted = column.getIsSorted();
@@ -24,20 +27,28 @@ export default function SortableHeader<TData, TValue>({
 		<Button
 			variant="ghost"
 			className={cn(
-				'h-8 px-4',
-				align === 'left' && '-ml-4',
-				align === 'right' && '-mr-4'
+				// the negative margin cancels the cell padding (tighter on phones)
+				'h-8 px-1.5 sm:px-4',
+				align === 'left' && '-ml-1.5 sm:-ml-4',
+				align === 'right' && '-mr-1.5 sm:-mr-4'
 			)}
 			onClick={column.getToggleSortingHandler()}
 			aria-label={`Sort by ${label}`}
 		>
-			{label}
-			{sorted === 'asc' ? (
-				<ArrowUp className="ml-2 h-4 w-4" />
-			) : sorted === 'desc' ? (
-				<ArrowDown className="ml-2 h-4 w-4" />
+			{shortLabel ? (
+				<>
+					<span className="sm:hidden">{shortLabel}</span>
+					<span className="hidden sm:inline">{label}</span>
+				</>
 			) : (
-				<ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+				label
+			)}
+			{sorted === 'asc' ? (
+				<ArrowUp className="ml-1 h-4 w-4 sm:ml-2" />
+			) : sorted === 'desc' ? (
+				<ArrowDown className="ml-1 h-4 w-4 sm:ml-2" />
+			) : (
+				<ArrowUpDown className="ml-1 h-4 w-4 opacity-50 sm:ml-2" />
 			)}
 		</Button>
 	);

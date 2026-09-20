@@ -1,4 +1,4 @@
-import { wrapEmailHtml, emailButtonHtml } from './shared';
+import { wrapEmailHtml, emailButtonHtml, escapeHtml } from './shared';
 
 type ShippingUpdateEmailProps = {
 	name: string;
@@ -16,9 +16,9 @@ export const buildShippingUpdateEmail = ({
 	const subject = `Your order has shipped — #${orderId.slice(-8)}`;
 
 	const html = wrapEmailHtml(`
-		<p>Hi ${name},</p>
+		<p>Hi ${escapeHtml(name)},</p>
 		<p>Good news &mdash; your order is on its way!</p>
-		${trackingNumber ? `<p>Tracking number: <strong>${trackingNumber}</strong></p>` : ''}
+		${trackingNumber ? `<p>Tracking number: <strong>${escapeHtml(trackingNumber)}</strong></p>` : ''}
 		${emailButtonHtml(orderUrl, 'View Your Order')}
 	`);
 

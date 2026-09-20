@@ -48,7 +48,6 @@ type Inputs = z.infer<typeof formSchema>;
 type CheckoutFormProps = {
 	clientSecret: string;
 	orderTotal: number;
-	user: string;
 	children?: React.ReactNode;
 };
 
@@ -59,7 +58,6 @@ const stripePromise = loadStripe(
 export default function AddAddressForm({
 	clientSecret,
 	orderTotal,
-	user,
 	children,
 }: CheckoutFormProps) {
 	const response: { errors: string[]; success: boolean } = {
@@ -84,10 +82,11 @@ export default function AddAddressForm({
 		Object.entries(data).forEach(([key, value]) => {
 			formData.append(key, value.toString());
 		});
-		// add user to form data
-		formData.append('user', user);
+		// the server checks this payment belongs to the signed-in customer, then
+		// attaches the address to it
+		formData.append('paymentIntentId', clientSecret.split('_secret_')[0]);
 
-		// add address to user profile
+		// add address to user profile and the payment
 		setResponseState(await userAddAddress({}, formData));
 	};
 
@@ -182,6 +181,11 @@ export default function AddAddressForm({
 								);
 							}}
 						/>
+						{responseState.errors.length > 0 && (
+							<p className="text-sm font-medium text-destructive" role="alert">
+								{responseState.errors.join(' ')}
+							</p>
+						)}
 						<Button type="submit" className="rounded-full">
 							Add Address
 						</Button>

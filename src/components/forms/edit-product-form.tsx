@@ -31,6 +31,13 @@ import ProductImagesField, {
 	ProductImagesValue,
 } from '@/components/forms/product-images-field';
 import { MAX_PRODUCT_IMAGES } from '@/lib/product-images';
+import {
+	checkOptionRows,
+	optionRowsFromProduct,
+	optionRowsPayload,
+	OptionRow,
+	ProductOptionsField,
+} from '@/components/forms/product-options-field';
 
 const formSchema = z // create a schema for the form data
 	.object({
@@ -43,7 +50,8 @@ const formSchema = z // create a schema for the form data
 			.string()
 			.min(2, { message: 'Description must be at least 2 characters' }),
 		categoryId: z.string(),
-		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
+		// checked in the submit handler: a product with options has no quantity of its own
+		quantity: z.string(),
 	});
 
 type Inputs = z.infer<typeof formSchema>;
@@ -65,7 +73,10 @@ export default function EditProductForm({
 			price: (product.priceInCents / 100).toFixed(2),
 			description: product.description,
 			categoryId: product.categoryId,
-			quantity: product.quantity?.toString() ?? '1',
+			// a product with options has no quantity of its own; if every option is
+			// removed the admin has to say how many there are
+			quantity:
+				product.variants.length > 0 ? '' : product.quantity?.toString() ?? '1',
 		},
 	});
 
@@ -75,9 +86,25 @@ export default function EditProductForm({
 	});
 	const [imageError, setImageError] = useState('');
 	const [formError, setFormError] = useState('');
+	// the product's options (sizes, colours...); none for most products
+	const [options, setOptions] = useState<OptionRow[]>(
+		optionRowsFromProduct(product.variants)
+	);
+	const [optionError, setOptionError] = useState('');
 
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
 		setFormError('');
+		const optionMessage = checkOptionRows(options);
+		if (optionMessage) {
+			setOptionError(optionMessage);
+			return;
+		}
+		setOptionError('');
+		// a product with options is stocked per option, so only one without needs a quantity
+		if (options.length === 0 && !data.quantity.trim()) {
+			form.setError('quantity', { message: 'Quantity must be at least 1' });
+			return;
+		}
 		const total = images.keep.length + images.added.length;
 		if (total < 1 || total > MAX_PRODUCT_IMAGES) {
 			setImageError(`A product needs between 1 and ${MAX_PRODUCT_IMAGES} images`);
@@ -92,6 +119,7 @@ export default function EditProductForm({
 			formData.append('description', data.description);
 			formData.append('categoryId', data.categoryId);
 			formData.append('quantity', data.quantity);
+			formData.append('variants', optionRowsPayload(options));
 			formData.append('keepImages', JSON.stringify(images.keep));
 			images.added.forEach((file) => formData.append('newImages', file));
 			const result = await productUpdate({}, formData);
@@ -173,7 +201,8 @@ export default function EditProductForm({
 							);
 						}}
 					/>
-					<FormField
+					{options.length === 0 && (
+						<FormField
 						control={form.control}
 						name="quantity"
 						render={({ field }) => {
@@ -192,6 +221,7 @@ export default function EditProductForm({
 							);
 						}}
 					/>
+					)}
 					<FormField
 						control={form.control}
 						name="categoryId"
@@ -224,6 +254,14 @@ export default function EditProductForm({
 								</FormItem>
 							);
 						}}
+					/>
+					<ProductOptionsField
+						value={options}
+						onChange={(next) => {
+							setOptions(next);
+							setOptionError('');
+						}}
+						error={optionError}
 					/>
 					<ProductImagesField
 						value={images}

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { ProductProps } from '@/db/product-db';
 import ProductToggleAvailable from './product-toggle-available';
+import ProductToggleFeatured from './product-toggle-featured';
 
 export default function ProductActions({ product }: { product: ProductProps }) {
 	const router = useRouter();
@@ -54,6 +55,9 @@ export default function ProductActions({ product }: { product: ProductProps }) {
 					</Link>
 					<ProductToggleAvailable
 						product={{ id: product.id, isActive: product.isAvailable }}
+					/>
+					<ProductToggleFeatured
+						product={{ id: product.id, isFeatured: product.isFeatured }}
 					/>
 					{canDelete && (
 						<DropdownMenuItem

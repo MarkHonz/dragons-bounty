@@ -12,9 +12,18 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { getProductById, ProductProps } from '@/db/product-db';
+import { getPurchaseInfo } from '@/db/product-db';
+import {
+	createCheckoutSnapshot,
+	SnapshotLine,
+	sweepOldCheckoutSnapshots,
+} from '@/db/checkout-snapshot-db';
+import { formatVariantLabel } from '@/lib/variants';
 import { formatCurrency } from '@/lib/formatters';
-import OrderTotals from '@/components/order-totals';
+import { signInUrl } from '@/lib/redirects';
+import OrderTotals, { discountRows } from '@/components/order-totals';
+import { getCartDiscount, getShippingRates } from '@/db/discount-db';
+import { calculateTotals, isChargeable } from '@/lib/pricing';
 
 if (!process.env.STRIPE_SECRET_KEY) {
 	throw new Error('Stripe secret key is not defined');
@@ -24,6 +33,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
 type CartItem = {
 	product_id: string;
+	variant_id: string;
 	quantity: number;
 	cart_id: string;
 };
@@ -40,7 +50,7 @@ export default async function CheckoutPage() {
 
 	// if the user is not authenticated, redirect to the sign-in page
 	if (authenticatedUser === 'guest') {
-		return redirect('/sign-in');
+		return redirect(signInUrl('/checkout'));
 	}
 
 	// get the cartId from the authenticated user
@@ -48,29 +58,60 @@ export default async function CheckoutPage() {
 
 	// get the cart items from the cartId
 	const cartItems = (await getCartById(cartId)) as CartItem[];
-	// map over the cart items and get the product details and calculate the total
-	// for each item
-	const cartTotals = await Promise.all(
-		cartItems.map(async (item) => {
-			if (item.product_id) {
-				const product = (await getProductById(item.product_id)) as ProductProps;
-				const total = product.priceInCents * (item.quantity ?? 0);
-				return total;
-			}
-			return 0;
-		})
-	);
-	// calculate the cart total by adding all the totals
-	const cartTotal = cartTotals.reduce(
-		(accumulatedTotal, currentTotal) => accumulatedTotal + currentTotal,
-		0
-	);
-	// calculate the shipping, tax, and order total
-	const shippingTotal = 999;
-	const taxTotal = Math.round((cartTotal + shippingTotal) * 0.0675);
-	const orderTotal = cartTotal + shippingTotal + taxTotal;
 
-	// create a payment intent
+	// Price every line from its product (and chosen option), and don't take
+	// payment for something that is no longer for sale or for more than is in
+	// stock: send the customer back to the cart, which says which items to fix.
+	const lines: SnapshotLine[] = [];
+	for (const item of cartItems) {
+		if (!item.product_id) continue;
+		const info = await getPurchaseInfo(item.product_id, item.variant_id);
+		if (
+			!info ||
+			!info.buyable ||
+			(info.quantity != null &&
+				(info.quantity <= 0 || (item.quantity ?? 0) > info.quantity))
+		) {
+			return redirect('/cart');
+		}
+		lines.push({
+			productId: item.product_id,
+			variantId: item.variant_id,
+			name: info.productName,
+			variantName: info.variantName,
+			unitPriceInCents: info.priceInCents,
+			quantity: item.quantity ?? 0,
+		});
+	}
+	// nothing to pay for
+	if (lines.length === 0) return redirect('/cart');
+
+	// A code that has stopped being valid sends the customer back to the cart,
+	// which says so; the totals below are the same ones the cart showed.
+	const cartDiscount = await getCartDiscount(cartId, authenticatedUser);
+	if (cartDiscount.problem) return redirect('/cart');
+
+	const totals = calculateTotals({
+		itemsInCents: lines.reduce(
+			(accumulatedTotal, line) =>
+				accumulatedTotal + line.unitPriceInCents * line.quantity,
+			0
+		),
+		discount: cartDiscount.rule,
+		shipping: await getShippingRates(),
+	});
+	// Stripe can't charge a tiny amount
+	if (!isChargeable(totals.totalInCents)) return redirect('/cart');
+	const {
+		itemsInCents: cartTotal,
+		discountInCents: discountTotal,
+		shippingInCents: shippingTotal,
+		taxInCents: taxTotal,
+		totalInCents: orderTotal,
+	} = totals;
+
+	// create a payment intent. The cart itself is kept in our own database (see
+	// createCheckoutSnapshot): Stripe limits metadata to 500 characters.
 	const paymentIntent = await stripe.paymentIntents.create({
 		amount: orderTotal,
 		currency: 'usd',
@@ -79,9 +120,11 @@ export default async function CheckoutPage() {
 			user_id: authenticatedUser,
 			cart_total: cartTotal,
 			shipping_total: shippingTotal,
+			discount_total: discountTotal,
+			// codes are at most 30 characters, far under Stripe's 500-character limit
+			discount_code: cartDiscount.code ?? '',
 			tax_total: taxTotal,
 			order_total: orderTotal,
-			cart_items: JSON.stringify(cartItems),
 			cart_id: cartId,
 		},
 	});
@@ -90,13 +133,21 @@ export default async function CheckoutPage() {
 		throw new Error('Client secret is not defined');
 	}
 
+	await createCheckoutSnapshot({
+		paymentIntentId: paymentIntent.id,
+		userId: authenticatedUser,
+		cartId,
+		lines,
+	});
+	// checkouts that were started and never paid don't pile up
+	await sweepOldCheckoutSnapshots();
+
 	return (
 		<main className="mx-auto max-w-5xl px-5 py-10 sm:px-10">
 			<h1 className="mb-6 font-display text-3xl font-semibold">Checkout</h1>
 			<AddAddressForm
 				clientSecret={paymentIntent.client_secret}
 				orderTotal={orderTotal}
-				user={authenticatedUser}
 			>
 				<Card className="shadow-warm-sm">
 					<CardContent className="pt-6">
@@ -110,27 +161,24 @@ export default async function CheckoutPage() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{cartItems.map(async (item) => {
-									if (item.product_id) {
-										const product = (await getProductById(
-											item.product_id
-										)) as ProductProps;
-										const total = product.priceInCents * (item.quantity ?? 0);
-										return (
-											<TableRow key={item.product_id}>
-												<TableCell>{product.name}</TableCell>
-												<TableCell className="text-center">
-													{item.quantity}
-												</TableCell>
-												<TableCell>
-													{formatCurrency(product.priceInCents / 100)}
-												</TableCell>
-												<TableCell>{formatCurrency(total / 100)}</TableCell>
-											</TableRow>
-										);
-									}
-									return null;
-								})}
+								{lines.map((line) => (
+									<TableRow key={`${line.productId}:${line.variantId}`}>
+										<TableCell>
+											{formatVariantLabel(line.name, line.variantName)}
+										</TableCell>
+										<TableCell className="text-center">
+											{line.quantity}
+										</TableCell>
+										<TableCell>
+											{formatCurrency(line.unitPriceInCents / 100)}
+										</TableCell>
+										<TableCell>
+											{formatCurrency(
+												(line.unitPriceInCents * line.quantity) / 100
+											)}
+										</TableCell>
+									</TableRow>
+								))}
 							</TableBody>
 						</Table>
 					</CardContent>
@@ -139,9 +187,16 @@ export default async function CheckoutPage() {
 							<OrderTotals
 								rows={[
 									{ label: 'Cart Total', value: formatCurrency(cartTotal / 100) },
+									...discountRows({
+										discountCode: cartDiscount.code,
+										discountInCents: discountTotal,
+									}),
 									{
 										label: 'Shipping',
-										value: formatCurrency(shippingTotal / 100),
+										value:
+											shippingTotal === 0
+												? 'Free'
+												: formatCurrency(shippingTotal / 100),
 									},
 									{ label: 'Tax', value: formatCurrency(taxTotal / 100) },
 									{

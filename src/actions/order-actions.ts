@@ -12,9 +12,16 @@ import {
 import { getProfileNameById, getUserByProfileId } from '@/db/user-db';
 import { sendRefundEmail, sendShippingUpdateEmail } from '@/lib/notifications';
 import { stripe } from '@/lib/stripe';
+import { logActivity } from '@/db/activity-db';
+import { addOrderNote, deleteOrderNote } from '@/db/order-notes-db';
+import { MAX_NOTE_LENGTH } from '@/lib/order-notes';
+import { formatCurrency } from '@/lib/formatters';
+
+// the short id the emails and the phone layout use
+const shortId = (orderId: string) => `#${orderId.slice(-8)}`;
 
 export const updateOrderFulfillmentAction = async (formData: FormData) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const orderId = formData.get('orderId')?.toString();
 	if (!orderId) return;
@@ -27,7 +34,36 @@ export const updateOrderFulfillmentAction = async (formData: FormData) => {
 	if (existingOrder?.refundedAt) return;
 	const wasFulfilled = existingOrder?.fulfilled ?? false;
 
-	await updateOrderFulfillment(orderId, { fulfilled, trackingNumber });
+	const updated = await updateOrderFulfillment(orderId, {
+		fulfilled,
+		trackingNumber,
+	});
+
+	// record what actually changed; saving with nothing changed writes nothing
+	if (existingOrder && !(updated instanceof Error)) {
+		const label = shortId(orderId);
+		if (fulfilled !== wasFulfilled) {
+			await logActivity(
+				admin.id,
+				'ORDER',
+				`Marked order ${label} as ${fulfilled ? 'shipped' : 'not shipped'}`,
+				orderId
+			);
+		}
+		const oldTracking = existingOrder.trackingNumber || null;
+		if (trackingNumber !== oldTracking) {
+			await logActivity(
+				admin.id,
+				'ORDER',
+				trackingNumber
+					? oldTracking
+						? `Changed the tracking number on order ${label} to ${trackingNumber}`
+						: `Added tracking number ${trackingNumber} to order ${label}`
+					: `Removed the tracking number from order ${label}`,
+				orderId
+			);
+		}
+	}
 
 	// only notify on the false -> true transition, never on repeat saves
 	if (!wasFulfilled && fulfilled && existingOrder) {
@@ -55,7 +91,7 @@ export const updateOrderFulfillmentAction = async (formData: FormData) => {
 // Refund an order in full. Goes through Stripe when the order has a payment on
 // record; otherwise it only marks the order refunded (no money moves).
 export const refundOrderAction = async (orderId: string, restock: boolean) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -127,6 +163,15 @@ export const refundOrderAction = async (orderId: string, restock: boolean) => {
 		return response;
 	}
 
+	await logActivity(
+		admin.id,
+		'ORDER',
+		`Refunded order ${shortId(order.id)} (${formatCurrency(order.totalInCents / 100)}${
+			paymentIntentId ? ' through Stripe' : ', marked by hand: no money moved'
+		}${restock ? ', items returned to stock' : ''})`,
+		order.id
+	);
+
 	// only email when money actually moved through Stripe; email failures must
 	// never undo a refund that already happened
 	if (paymentIntentId) {
@@ -154,6 +199,81 @@ export const refundOrderAction = async (orderId: string, restock: boolean) => {
 	// stock levels changed
 	if (restock) revalidatePath('/', 'layout');
 
+	response.success = true;
+	return response;
+};
+
+// --- admin-only notes on an order ---
+
+export const addOrderNoteAction = async (orderId: string, body: string) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	if (typeof orderId !== 'string' || typeof body !== 'string') {
+		response.errors.push('Invalid note.');
+		return response;
+	}
+	const text = body.trim();
+	if (text.length === 0) {
+		response.errors.push('Write something first.');
+		return response;
+	}
+	if (text.length > MAX_NOTE_LENGTH) {
+		response.errors.push(`Notes can be up to ${MAX_NOTE_LENGTH} characters.`);
+		return response;
+	}
+
+	let note;
+	try {
+		note = await addOrderNote(orderId, admin.id, text);
+	} catch (error) {
+		console.error('Failed to add a note', error);
+		response.errors.push('Failed to save the note. Please try again.');
+		return response;
+	}
+	if (!note) {
+		response.errors.push('Order not found.');
+		return response;
+	}
+
+	// the log says a note was added, not what it says
+	await logActivity(
+		admin.id,
+		'ORDER',
+		`Added a note to order ${shortId(orderId)}`,
+		orderId
+	);
+	revalidatePath(`/admin/orders/${orderId}`);
+	response.success = true;
+	return response;
+};
+
+export const deleteOrderNoteAction = async (noteId: string) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	const orderId =
+		typeof noteId === 'string' ? await deleteOrderNote(noteId) : null;
+	if (!orderId) {
+		response.errors.push('That note no longer exists.');
+		return response;
+	}
+
+	await logActivity(
+		admin.id,
+		'ORDER',
+		`Deleted a note from order ${shortId(orderId)}`,
+		orderId
+	);
+	revalidatePath(`/admin/orders/${orderId}`);
 	response.success = true;
 	return response;
 };

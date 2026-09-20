@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ColumnDef } from '@tanstack/react-table';
 
 import SortableHeader from '@/components/sortable-header';
+import { Badge } from '@/components/ui/badge';
 import type { CustomerRow } from '@/db/user-db';
 
 export const columns: ColumnDef<CustomerRow>[] = [
@@ -12,19 +13,30 @@ export const columns: ColumnDef<CustomerRow>[] = [
 		header: ({ column }) => <SortableHeader column={column} label="Name" />,
 		sortingFn: 'alphanumeric',
 		cell: ({ row }) => (
-			<div className="break-words">{row.original.name ?? '—'}</div>
+			<div className="break-words">
+				{row.original.name ?? '—'}
+				{row.original.role === 'ADMIN' && (
+					<Badge className="ml-2 align-middle">Admin</Badge>
+				)}
+				{/* the Email column is hidden on phones */}
+				<p className="break-all text-xs text-muted-foreground sm:hidden">
+					{row.original.email}
+				</p>
+			</div>
 		),
 	},
 	{
 		accessorKey: 'email',
 		header: ({ column }) => <SortableHeader column={column} label="Email" />,
 		sortingFn: 'alphanumeric',
+		meta: { className: 'hidden sm:table-cell' },
 		cell: ({ row }) => <div className="break-words">{row.original.email}</div>,
 	},
 	{
 		accessorKey: 'cartId',
 		header: 'Cart ID',
 		enableSorting: false,
+		meta: { className: 'hidden sm:table-cell' },
 		cell: ({ row }) => (
 			<div className="break-words text-muted-foreground">
 				{row.original.cartId ?? '—'}

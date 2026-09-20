@@ -19,11 +19,25 @@ import {
 	OrderProps,
 } from '@/db/orders-db';
 import { getProductNameById } from '@/db/product-db';
-import { AddressType, getAddressByProfileId } from '@/db/user-db';
+import { getAddressByProfileId } from '@/db/user-db';
 import { formatCurrency } from '@/lib/formatters';
+import { formatVariantLabel } from '@/lib/variants';
 import { updateOrderFulfillmentAction } from '@/actions/order-actions';
-import OrderTotals from '@/components/order-totals';
+import OrderTotals, { discountRows } from '@/components/order-totals';
 import RefundOrderForm from '../_components/refund-order-form';
+import OrderNotes from '../_components/order-notes';
+import OrderHistory from '../_components/order-history';
+import { getOrderNotes } from '@/db/order-notes-db';
+import { getOrderActivity } from '@/db/activity-db';
+
+type ShippingAddress = {
+	name: string | null;
+	address1: string | null;
+	address2: string | null;
+	city: string | null;
+	state: string | null;
+	zip: string | null;
+};
 
 type OrderDetailsParams = {
 	params: {
@@ -42,13 +56,42 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 		return <p className="text-center text-muted-foreground">Order not found</p>;
 	}
 
-	// get the order address
-	const address = (await getAddressByProfileId(order.profileId)) as AddressType;
+	// the address saved with the order at checkout; orders placed before that was
+	// saved fall back to the customer's current profile address, which may differ
+	const hasSavedAddress = Boolean(order.shipToAddress1);
+	const address: ShippingAddress | null = hasSavedAddress
+		? {
+				name: order.shipToName ?? null,
+				address1: order.shipToAddress1 ?? null,
+				address2: order.shipToAddress2 ?? null,
+				city: order.shipToCity ?? null,
+				state: order.shipToState ?? null,
+				zip: order.shipToZip ?? null,
+			}
+		: await getAddressByProfileId(order.profileId);
+	const addressRows: [string, string | null | undefined][] = [
+		['Name', address?.name],
+		['Address 1', address?.address1],
+		['Address 2', address?.address2],
+		['City', address?.city],
+		['State', address?.state],
+		['Zip', address?.zip],
+	];
 
 	// get the order products
 	const orderProducts = (await getOrderProductsByOrderId(
 		order.id
 	)) as OrderProductProps[];
+
+	// the History card is a convenience: if the log can't be read, the rest of
+	// the order page still works
+	const [notes, history] = await Promise.all([
+		getOrderNotes(order.id),
+		getOrderActivity(order.id).catch((error) => {
+			console.error('Failed to read the order history', error);
+			return [];
+		}),
+	]);
 
 	const isRefunded = Boolean(order.refundedAt);
 	const status = isRefunded
@@ -106,8 +149,10 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 										product.product_id
 									)) as string;
 									return (
-										<TableRow key={product.product_id}>
-											<TableCell>{productName}</TableCell>
+										<TableRow key={`${product.product_id}:${product.variant_id}`}>
+											<TableCell>
+											{formatVariantLabel(productName, product.variantName)}
+										</TableCell>
 											<TableCell>{product.quantity}</TableCell>
 											<TableCell>
 												{formatCurrency(product.priceInCents / 100)}
@@ -130,6 +175,7 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 									label: 'Product Total',
 									value: formatCurrency(order.productTotalInCents / 100),
 								},
+								...discountRows(order),
 								{
 									label: 'Shipping Total',
 									value: formatCurrency(order.shippingTotalInCents / 100),
@@ -189,36 +235,25 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2 text-sm">
-						<div className="flex justify-between gap-4">
-							<span className="text-muted-foreground">Name</span>
-							<span className="text-right font-semibold">{address.name}</span>
-						</div>
-						<div className="flex justify-between gap-4">
-							<span className="text-muted-foreground">Address 1</span>
-							<span className="text-right font-semibold">
-								{address.address1}
-							</span>
-						</div>
-						<div className="flex justify-between gap-4">
-							<span className="text-muted-foreground">Address 2</span>
-							<span className="text-right font-semibold">
-								{address.address2}
-							</span>
-						</div>
-						<div className="flex justify-between gap-4">
-							<span className="text-muted-foreground">City</span>
-							<span className="text-right font-semibold">{address.city}</span>
-						</div>
-						<div className="flex justify-between gap-4">
-							<span className="text-muted-foreground">State</span>
-							<span className="text-right font-semibold">{address.state}</span>
-						</div>
-						<div className="flex justify-between gap-4">
-							<span className="text-muted-foreground">Zip</span>
-							<span className="text-right font-semibold">{address.zip}</span>
-						</div>
+						{!hasSavedAddress && (
+							<p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+								This order was placed before shipping addresses were saved with
+								orders. This is the customer&apos;s current address, and it may
+								have changed since the order.
+							</p>
+						)}
+						{addressRows.map(([label, value]) => (
+							<div key={label} className="flex justify-between gap-4">
+								<span className="text-muted-foreground">{label}</span>
+								<span className="text-right font-semibold">{value}</span>
+							</div>
+						))}
 					</CardContent>
 				</Card>
+			</div>
+			<div className="mt-6 flex flex-col items-start gap-6 md:flex-row">
+				<OrderNotes orderId={order.id} notes={notes} />
+				<OrderHistory entries={history} />
 			</div>
 		</main>
 	);

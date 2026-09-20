@@ -14,17 +14,29 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import RemoveItem from './remove-item';
 import { formatCurrency } from '@/lib/formatters';
-import { getQuantityInStock } from '@/actions/product-actions';
+import { formatVariantLabel } from '@/lib/variants';
+import { getProductPurchaseInfo } from '@/actions/product-actions';
 import { updateCartItem } from '@/actions/cart-actions';
 
 interface CartItem {
 	productId: string;
+	// the chosen option; "" or missing for a product without options
+	variantId?: string;
 	name: string;
+	// the option's name, shown after the product's
+	variantName?: string;
 	quantity: number;
 	price: number;
 	cartId: string;
-	numberInStock?: number;
+	// null or missing when stock isn't tracked
+	numberInStock?: number | null;
+	// false when the product has been switched off (or its category has)
+	isAvailable?: boolean;
 }
+
+// a cart line is a product plus the option chosen for it (if it has options)
+const lineKey = (item: { productId: string; variantId?: string }) =>
+	`${item.productId}:${item.variantId ?? ''}`;
 
 export default function CartTable({
 	user,
@@ -55,8 +67,20 @@ export default function CartTable({
 		// enriched stock data server-side via initialItems
 		Promise.all(
 			items.map(async (item) => {
-				const quantityInStock = await getQuantityInStock(item.productId);
-				return { ...item, numberInStock: quantityInStock || 0 };
+				const info = await getProductPurchaseInfo(
+					item.productId,
+					item.variantId ?? ''
+				);
+				// null means stock isn't tracked for this product. Name, option and
+				// price come from the server, so a price change shows up here too.
+				return {
+					...item,
+					name: info.productName || item.name,
+					variantName: info.variantName || item.variantName || '',
+					price: info.buyable ? info.priceInCents : item.price,
+					numberInStock: info.quantity ?? undefined,
+					isAvailable: info.buyable,
+				};
 			})
 		).then(setGuestCartItems);
 	}, [isGuest]);
@@ -85,12 +109,18 @@ export default function CartTable({
 		const formData = new FormData(form);
 		const quantity = Number(formData.get('quantity')) || (1 as number);
 		const productId = formData.get('productId') as string;
-		// add cartId to the form data
-		formData.append('cartId', cartId.current);
+		const variantId = (formData.get('variantId') as string | null) ?? '';
 
 		// check if the quantity is greater than the numberInStock
-		const item = localCartItems.find((item) => item.productId === productId);
-		if (item && item.numberInStock && quantity > item.numberInStock) {
+		const item = localCartItems.find(
+			(item) =>
+				item.productId === productId && (item.variantId ?? '') === variantId
+		);
+		if (
+			item &&
+			item.numberInStock != null &&
+			quantity > item.numberInStock
+		) {
 			alert(
 				`Quantity cannot be greater than the number in stock: (${item.numberInStock})`
 			);
@@ -103,7 +133,10 @@ export default function CartTable({
 				window.localStorage.getItem('cartItems') || '[]'
 			);
 			const updatedCartItems = cartItems.map((item: CartItem) => {
-				if (item.productId === productId) {
+				if (
+					item.productId === productId &&
+					(item.variantId ?? '') === variantId
+				) {
 					item.quantity = quantity;
 				}
 				return item;
@@ -117,15 +150,31 @@ export default function CartTable({
 		router.refresh();
 	};
 
+	// tells the customer when a line can't be bought as it stands
+	const stockNote = (item: CartItem) => {
+		if (item.isAvailable === false) {
+			return 'No longer available. Remove it to check out.';
+		}
+		if (item.numberInStock == null) return null;
+		if (item.numberInStock <= 0) {
+			return 'Sold out. Remove it to check out.';
+		}
+		if (item.quantity > item.numberInStock) {
+			return `Only ${item.numberInStock} left. Lower the quantity to check out.`;
+		}
+		return null;
+	};
+
 	const quantityForm = (item: CartItem) => (
 		<form onSubmit={handleUpdateQuantity} className="flex items-center gap-2">
 			<input type="hidden" name="productId" value={item.productId} />
+			<input type="hidden" name="variantId" value={item.variantId ?? ''} />
 			<Input
 				type="number"
 				name="quantity"
 				id="quantity"
 				min="1"
-				max={item.numberInStock}
+				max={item.numberInStock ?? undefined}
 				defaultValue={item.quantity}
 				className="h-9 w-16"
 			/>
@@ -156,8 +205,15 @@ export default function CartTable({
 					<TableBody>
 						{localCartItems.map((item: CartItem) => {
 							return (
-								<TableRow key={item.productId}>
-									<TableCell className="font-semibold">{item.name}</TableCell>
+								<TableRow key={lineKey(item)}>
+									<TableCell className="font-semibold">
+										{formatVariantLabel(item.name, item.variantName)}
+										{stockNote(item) && (
+											<p className="text-sm font-medium text-destructive">
+												{stockNote(item)}
+											</p>
+										)}
+									</TableCell>
 									<TableCell>{quantityForm(item)}</TableCell>
 									<TableCell>{formatCurrency(item.price / 100)}</TableCell>
 									<TableCell>
@@ -167,6 +223,7 @@ export default function CartTable({
 										<RemoveItem
 											cartId={cartId.current}
 											productId={item.productId}
+											variantId={item.variantId ?? ''}
 										/>
 									</TableCell>
 								</TableRow>
@@ -176,15 +233,26 @@ export default function CartTable({
 				</Table>
 				<div className="flex flex-col divide-y divide-border sm:hidden">
 					{localCartItems.map((item: CartItem) => (
-						<div key={item.productId} className="flex flex-col gap-3 py-4">
+						<div key={lineKey(item)} className="flex flex-col gap-3 py-4">
 							<div className="flex items-start justify-between gap-3">
 								<div>
-									<p className="font-semibold">{item.name}</p>
+									<p className="font-semibold">
+										{formatVariantLabel(item.name, item.variantName)}
+									</p>
 									<p className="text-sm text-muted-foreground">
 										{formatCurrency(item.price / 100)} each
 									</p>
+									{stockNote(item) && (
+										<p className="text-sm font-medium text-destructive">
+											{stockNote(item)}
+										</p>
+									)}
 								</div>
-								<RemoveItem cartId={cartId.current} productId={item.productId} />
+								<RemoveItem
+									cartId={cartId.current}
+									productId={item.productId}
+									variantId={item.variantId ?? ''}
+								/>
 							</div>
 							<div className="flex items-center justify-between gap-3">
 								{quantityForm(item)}

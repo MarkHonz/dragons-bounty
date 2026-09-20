@@ -8,6 +8,16 @@ export const emailColors = {
 	primaryText: '#FFFFFF',
 };
 
+// Anything a customer or admin typed (names, product names, addresses, tracking
+// numbers) must go through this before it is placed inside email HTML.
+export const escapeHtml = (value: string) =>
+	value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+
 export const wrapEmailHtml = (bodyHtml: string) => `
 <!DOCTYPE html>
 <html>
@@ -43,7 +53,7 @@ export const emailButtonHtml = (href: string, label: string) => `
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 16px 0;">
 	<tr>
 		<td style="border-radius: 999px; background-color:${emailColors.primary};">
-			<a href="${href}" style="display:inline-block; padding: 12px 28px; color:${emailColors.primaryText}; text-decoration:none; font-weight:bold; font-size: 14px;">
+			<a href="${escapeHtml(href)}" style="display:inline-block; padding: 12px 28px; color:${emailColors.primaryText}; text-decoration:none; font-weight:bold; font-size: 14px;">
 				${label}
 			</a>
 		</td>

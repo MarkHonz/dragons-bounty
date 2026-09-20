@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { userSubmit } from '@/actions/user-actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { safeRedirectPath } from '@/lib/redirects';
+import { useHydrated } from '@/lib/use-hydrated';
 
 const formSchema = z // create a schema for the form data
 	.object({
@@ -36,8 +38,15 @@ const formSchema = z // create a schema for the form data
 
 type Inputs = z.infer<typeof formSchema>;
 
-export default function CreateUserForm() {
+type CreateUserFormProps = {
+	// where to go after the account is created; without it, the account page
+	next?: string | null;
+};
+
+export default function CreateUserForm({ next }: CreateUserFormProps) {
 	const router = useRouter();
+	// keeps Submit disabled until the form's JavaScript is running (see useHydrated)
+	const hydrated = useHydrated();
 	const form = useForm<Inputs>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -60,9 +69,10 @@ export default function CreateUserForm() {
 		formData.append('cartItems', JSON.stringify(cartItems));
 		// call the userSubmit function to create a new user
 		const result = await userSubmit({}, formData);
-		// if the user was created successfully, redirect to the account
+		// if the user was created successfully, go where they were headed (checked
+		// again here so this can never send anyone to another site), else the account
 		if (result.success) {
-			router.push('/account');
+			router.push(safeRedirectPath(next) ?? '/account');
 		}
 	};
 
@@ -153,12 +163,16 @@ export default function CreateUserForm() {
 								}}
 							/>
 						</fieldset>
-						<Button type="submit" className="rounded-full">
+						<Button type="submit" className="rounded-full" disabled={!hydrated}>
 							Submit
 						</Button>
 						<Link
 							className="mt-5 border-t border-border pt-4 text-center text-primary"
-							href="/sign-in"
+							href={
+								safeRedirectPath(next)
+									? `/sign-in?next=${encodeURIComponent(next as string)}`
+									: '/sign-in'
+							}
 						>
 							Sign In To An Existing Account
 						</Link>

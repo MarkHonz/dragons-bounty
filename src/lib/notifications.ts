@@ -1,8 +1,13 @@
 import { sendEmail } from '@/lib/email';
 import { buildVerificationEmail } from '@/lib/emails/verification-email';
-import { buildOrderConfirmationEmail } from '@/lib/emails/order-confirmation-email';
+import {
+	buildOrderConfirmationEmail,
+	ShippingAddress,
+} from '@/lib/emails/order-confirmation-email';
 import { buildShippingUpdateEmail } from '@/lib/emails/shipping-update-email';
 import { buildRefundEmail } from '@/lib/emails/refund-email';
+import { buildRoleChangeEmail } from '@/lib/emails/role-change-email';
+import { buildAdminAddedNoticeEmail } from '@/lib/emails/admin-added-notice-email';
 
 type SendVerificationEmailProps = {
 	name: string;
@@ -27,8 +32,11 @@ type SendOrderConfirmationEmailProps = {
 	productTotalInCents: number;
 	shippingTotalInCents: number | null;
 	taxTotalInCents: number | null;
+	discountInCents?: number | null;
+	discountCode?: string | null;
 	totalInCents: number;
 	orderUrl: string;
+	shippingAddress?: ShippingAddress | null;
 };
 
 export const sendOrderConfirmationEmail = async ({
@@ -39,8 +47,11 @@ export const sendOrderConfirmationEmail = async ({
 	productTotalInCents,
 	shippingTotalInCents,
 	taxTotalInCents,
+	discountInCents,
+	discountCode,
 	totalInCents,
 	orderUrl,
+	shippingAddress,
 }: SendOrderConfirmationEmailProps) => {
 	const { subject, html, text } = buildOrderConfirmationEmail({
 		name,
@@ -49,8 +60,11 @@ export const sendOrderConfirmationEmail = async ({
 		productTotalInCents,
 		shippingTotalInCents,
 		taxTotalInCents,
+		discountInCents,
+		discountCode,
 		totalInCents,
 		orderUrl,
+		shippingAddress,
 	});
 	return sendEmail({ to: email, subject, html, text });
 };
@@ -99,6 +113,54 @@ export const sendRefundEmail = async ({
 		orderId,
 		refundedAmountInCents,
 		orderUrl,
+	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+type SendRoleChangeEmailProps = {
+	name: string;
+	email: string;
+	promoted: boolean;
+	changedBy: string;
+	adminUrl: string;
+};
+
+export const sendRoleChangeEmail = async ({
+	name,
+	email,
+	promoted,
+	changedBy,
+	adminUrl,
+}: SendRoleChangeEmailProps) => {
+	const { subject, html, text } = buildRoleChangeEmail({
+		name,
+		promoted,
+		changedBy,
+		adminUrl,
+	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+type SendAdminAddedNoticeEmailProps = {
+	name: string;
+	email: string;
+	newAdmin: string;
+	changedBy: string;
+	roleHistoryUrl: string;
+};
+
+export const sendAdminAddedNoticeEmail = async ({
+	name,
+	email,
+	newAdmin,
+	changedBy,
+	roleHistoryUrl,
+}: SendAdminAddedNoticeEmailProps) => {
+	const { subject, html, text } = buildAdminAddedNoticeEmail({
+		name,
+		newAdmin,
+		changedBy,
+		roleHistoryUrl,
 	});
 	return sendEmail({ to: email, subject, html, text });
 };

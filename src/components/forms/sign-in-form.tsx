@@ -19,6 +19,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { userLogin } from '@/actions/user-actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { safeRedirectPath } from '@/lib/redirects';
+import { useHydrated } from '@/lib/use-hydrated';
 
 const formSchema = z // create a schema for the form data
 	.object({
@@ -30,9 +32,16 @@ const formSchema = z // create a schema for the form data
 
 type Inputs = z.infer<typeof formSchema>;
 
-export default function SignInForm() {
+type SignInFormProps = {
+	// where to go after signing in; without it the person goes back to the page they came from
+	next?: string | null;
+};
+
+export default function SignInForm({ next }: SignInFormProps) {
 	const router = useRouter();
 	const [showPassword, setShowPassword] = useState(false);
+	// keeps Submit disabled until the form's JavaScript is running (see useHydrated)
+	const hydrated = useHydrated();
 	const form = useForm<Inputs>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -60,7 +69,14 @@ export default function SignInForm() {
 			// clear the local copy since the DB is authoritative from here on
 			localStorage.removeItem('cartItems');
 			localStorage.removeItem('cartId');
-			router.back();
+			// check again here even though the page already did: this must never
+			// send anyone to another site
+			const destination = safeRedirectPath(next);
+			if (destination) {
+				router.push(destination);
+			} else {
+				router.back();
+			}
 			router.refresh();
 		}
 	};
@@ -145,12 +161,16 @@ export default function SignInForm() {
 								}}
 							/>
 						</fieldset>
-						<Button type="submit" className="rounded-full">
+						<Button type="submit" className="rounded-full" disabled={!hydrated}>
 							Submit
 						</Button>
 						<Link
 							className="mt-5 border-t border-border pt-4 text-center text-primary"
-							href="/create-account"
+							href={
+								safeRedirectPath(next)
+									? `/create-account?next=${encodeURIComponent(next as string)}`
+									: '/create-account'
+							}
 						>
 							Create A New Account
 						</Link>

@@ -29,6 +29,12 @@ import ProductImagesField, {
 	ProductImagesValue,
 } from '@/components/forms/product-images-field';
 import { MAX_PRODUCT_IMAGES } from '@/lib/product-images';
+import {
+	checkOptionRows,
+	optionRowsPayload,
+	OptionRow,
+	ProductOptionsField,
+} from '@/components/forms/product-options-field';
 
 const formSchema = z // create a schema for the form data
 	.object({
@@ -43,7 +49,8 @@ const formSchema = z // create a schema for the form data
 		categoryId: z
 			.string()
 			.min(2, { message: 'Category must be at least 2 characters' }),
-		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
+		// checked in the submit handler: a product with options has no quantity of its own
+		quantity: z.string(),
 	});
 // infer the type of the form data
 type Inputs = z.infer<typeof formSchema>;
@@ -72,9 +79,23 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 	});
 	const [imageError, setImageError] = useState('');
 	const [formError, setFormError] = useState('');
+	// optional options (sizes, colours...); none for most products
+	const [options, setOptions] = useState<OptionRow[]>([]);
+	const [optionError, setOptionError] = useState('');
 	// create a submit handler
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
 		setFormError('');
+		const optionMessage = checkOptionRows(options);
+		if (optionMessage) {
+			setOptionError(optionMessage);
+			return;
+		}
+		setOptionError('');
+		// a product with options is stocked per option, so only one without needs a quantity
+		if (options.length === 0 && !data.quantity.trim()) {
+			form.setError('quantity', { message: 'Quantity must be at least 1' });
+			return;
+		}
 		if (images.added.length < 1 || images.added.length > MAX_PRODUCT_IMAGES) {
 			setImageError(`Add between 1 and ${MAX_PRODUCT_IMAGES} images`);
 			return;
@@ -86,6 +107,7 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 			formData.append('price', data.price);
 			formData.append('description', data.description);
 			formData.append('quantity', data.quantity);
+			formData.append('variants', optionRowsPayload(options));
 			formData.append('categoryId', data.categoryId);
 			images.added.forEach((file) => formData.append('images', file));
 			const result = await productSubmit({}, formData);
@@ -165,21 +187,23 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 							);
 						}}
 					/>
-					<FormField
-						control={form.control}
-						name="quantity"
-						render={({ field }) => {
-							return (
-								<FormItem className="pb-2">
-									<FormLabel className="pl-2">Quantity</FormLabel>
-									<FormControl>
-										<Input placeholder="quantity" type="number" {...field} />
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							);
-						}}
-					/>
+					{options.length === 0 && (
+						<FormField
+							control={form.control}
+							name="quantity"
+							render={({ field }) => {
+								return (
+									<FormItem className="pb-2">
+										<FormLabel className="pl-2">Quantity</FormLabel>
+										<FormControl>
+											<Input placeholder="quantity" type="number" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								);
+							}}
+						/>
+					)}
 					<FormField
 						control={form.control}
 						name="categoryId"
@@ -210,6 +234,16 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 							);
 						}}
 					/>
+					<div className="pb-2">
+						<ProductOptionsField
+							value={options}
+							onChange={(next) => {
+								setOptions(next);
+								setOptionError('');
+							}}
+							error={optionError}
+						/>
+					</div>
 					<ProductImagesField
 						value={images}
 						onChange={(next) => {

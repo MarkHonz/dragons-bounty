@@ -1,13 +1,16 @@
+import { notFound } from 'next/navigation';
+
 import { verifyAuthSession } from '@/lib/auth';
 import { formatCurrency } from '@/lib/formatters';
 import AddToCartButton from '@/components/add-to-cart-button';
 import ProductImageCarousel from '@/components/product-image-carousel';
 import { getUserById } from '@/db/user-db';
-import { getProductById } from '@/db/product-db';
+import { getProductById, isProductBuyable } from '@/db/product-db';
 import { ProductProps } from '@/db/product-db';
 import { UserProps } from '@/db/user-db';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { hasVariants } from '@/lib/variants';
 
 type Params = {
 	params: {
@@ -19,7 +22,12 @@ export default async function ProductDetailPage({ params }: Params) {
 	const sessionUserId = await verifyAuthSession();
 	// get product by id
 	const { productSlug } = params;
-	const product = (await getProductById(productSlug)) as ProductProps;
+	const product = (await getProductById(productSlug)) as ProductProps | null;
+	// a product that doesn't exist, or is switched off (or in a switched-off
+	// category), is "not found" for shoppers
+	if (!product || product instanceof Error || !isProductBuyable(product)) {
+		notFound();
+	}
 	// get user by id
 	let authenticatedUser = '';
 
@@ -52,9 +60,12 @@ export default async function ProductDetailPage({ params }: Params) {
 					<p className="text-base leading-relaxed text-muted-foreground">
 						{product.description}
 					</p>
-					<p className="text-2xl font-extrabold">
-						{formatCurrency(product.priceInCents / 100)}
-					</p>
+					{/* with options the price follows the chosen option, so the button shows it */}
+					{!hasVariants(product) && (
+						<p className="text-2xl font-extrabold">
+							{formatCurrency(product.priceInCents / 100)}
+						</p>
+					)}
 					<AddToCartButton
 						cartId={
 							user && user.profile.Cart !== null ? user.profile.Cart.id : 'guest'
@@ -64,6 +75,8 @@ export default async function ProductDetailPage({ params }: Params) {
 						name={product.name}
 						price={product.priceInCents}
 						numberInStock={product.quantity}
+						variants={product.variants}
+						showPrice
 					/>
 				</div>
 			</Card>

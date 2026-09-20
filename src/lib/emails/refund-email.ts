@@ -1,4 +1,4 @@
-import { wrapEmailHtml, emailButtonHtml } from './shared';
+import { wrapEmailHtml, emailButtonHtml, escapeHtml } from './shared';
 import { formatCurrency } from '@/lib/formatters';
 
 type RefundEmailProps = {
@@ -18,7 +18,7 @@ export const buildRefundEmail = ({
 	const subject = `Your order has been refunded — #${orderId.slice(-8)}`;
 
 	const html = wrapEmailHtml(`
-		<p>Hi ${name},</p>
+		<p>Hi ${escapeHtml(name)},</p>
 		<p>We've refunded <strong>${amount}</strong> for order #${orderId.slice(-8)} to your original payment method.</p>
 		<p>It usually takes 5&ndash;10 business days to show up, depending on your bank.</p>
 		${emailButtonHtml(orderUrl, 'View Your Order')}

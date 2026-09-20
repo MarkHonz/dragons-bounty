@@ -10,17 +10,20 @@ import {
 import slugify from 'slugify';
 
 import { assertAdminOrThrow } from '@/lib/auth';
+import { parseVariantInputs } from '@/lib/variant-input';
 import {
 	createProduct,
 	deleteProduct,
 	getProductById,
-	getProductQuantityById,
+	getPurchaseInfo,
 	ProductProps,
 	toggleProductAvailable,
+	toggleProductFeatured,
 	updateProductWithImages,
 } from '@/db/product-db';
 import { MAX_PRODUCT_IMAGES, validateImageFile } from '@/lib/product-images';
 import { parsePriceToCents } from '@/lib/formatters';
+import { logActivity } from '@/db/activity-db';
 
 const s3Client = new S3Client({
 	region: process.env.NEXT_AWS_S3_REGION!,
@@ -91,7 +94,7 @@ export const productSubmit = async (
 	previousState: object,
 	formData: FormData
 ) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const name = formData.get('name') as string | null;
 	const price = formData.get('price') as string | null;
@@ -104,6 +107,14 @@ export const productSubmit = async (
 		success: false,
 	};
 
+	// options (sizes, colours...) are optional; most products have none
+	const parsedOptions = parseVariantInputs(formData.get('variants'));
+	if ('error' in parsedOptions) {
+		response.errors.push(parsedOptions.error);
+		return response;
+	}
+	const variants = parsedOptions.variants;
+
 	// Create a schema for the form data
 	const schema = z.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
@@ -114,7 +125,11 @@ export const productSubmit = async (
 		categoryId: z
 			.string()
 			.min(2, { message: 'Category must be at least 2 characters' }),
-		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
+		// a product with options is stocked per option, so it has no quantity of its own
+		quantity:
+			variants.length > 0
+				? z.string()
+				: z.string().min(1, { message: 'Quantity must be at least 1' }),
 	});
 
 	try {
@@ -135,7 +150,7 @@ export const productSubmit = async (
 	}
 
 	const priceInCents = parsePriceToCents(price as string);
-	quantity = parseInt(quantity as string, 10);
+	quantity = variants.length > 0 ? 0 : parseInt(quantity as string, 10);
 
 	// Check if the name is a string
 	if (typeof name !== 'string') {
@@ -153,7 +168,7 @@ export const productSubmit = async (
 		return response;
 	}
 
-	if (typeof quantity !== 'number') {
+	if (typeof quantity !== 'number' || Number.isNaN(quantity)) {
 		response.errors.push('Invalid quantity');
 		return response;
 	}
@@ -194,12 +209,15 @@ export const productSubmit = async (
 		categoryId,
 		imagePaths: imageKeys,
 		quantity,
+		variants,
 	});
 	if (created instanceof Error) {
 		await deleteObjects(imageKeys);
 		response.errors.push('Failed to create the product');
 		return response;
 	}
+
+	await logActivity(admin.id, 'PRODUCT', `Created the product "${name}"`);
 
 	// Revalidate the product page
 	revalidatePath(`/products`, 'layout');
@@ -209,7 +227,7 @@ export const productSubmit = async (
 };
 
 export const productDelete = async (id: string) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -238,13 +256,23 @@ export const productDelete = async (id: string) => {
 
 	await deleteObjects(imageKeys);
 
+	await logActivity(
+		admin.id,
+		'PRODUCT',
+		`Deleted the product "${
+			existing && !(existing instanceof Error)
+				? (existing as ProductProps).name
+				: id
+		}"`
+	);
+
 	revalidatePath(`/products`, 'layout');
 	response.success = true;
 	return response;
 };
 
 export const toggleAvailable = async (id: string, isActive: boolean) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -252,7 +280,41 @@ export const toggleAvailable = async (id: string, isActive: boolean) => {
 	};
 
 	// Update the product
-	await toggleProductAvailable(id, isActive);
+	const updated = await toggleProductAvailable(id, isActive);
+	if (!(updated instanceof Error)) {
+		await logActivity(
+			admin.id,
+			'PRODUCT',
+			`${isActive ? 'Made available' : 'Hid'} the product "${(updated as { name: string }).name}"`
+		);
+	}
+
+	response.success = true;
+	return response;
+};
+
+export const toggleFeatured = async (id: string, isFeatured: boolean) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	const updated = await toggleProductFeatured(id, isFeatured);
+	if (updated instanceof Error) {
+		response.errors.push('Failed to update the product');
+		return response;
+	}
+
+	await logActivity(
+		admin.id,
+		'PRODUCT',
+		`${isFeatured ? 'Featured' : 'Removed the Featured flag from'} the product "${(updated as { name: string }).name}"`
+	);
+
+	// the homepage, category pages and search all list featured products first
+	revalidatePath('/', 'layout');
 
 	response.success = true;
 	return response;
@@ -262,7 +324,7 @@ export const productUpdate = async (
 	previousState: object,
 	formData: FormData
 ) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const name = formData.get('name') as string | null;
 	const price = formData.get('price') as string | null;
@@ -277,6 +339,14 @@ export const productUpdate = async (
 		success: false,
 	};
 
+	// the product's full list of options after this edit (empty for none)
+	const parsedOptions = parseVariantInputs(formData.get('variants'));
+	if ('error' in parsedOptions) {
+		response.errors.push(parsedOptions.error);
+		return response;
+	}
+	const variants = parsedOptions.variants;
+
 	// Create a schema for the form data
 	const schema = z.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
@@ -288,7 +358,11 @@ export const productUpdate = async (
 			.string()
 			.min(2, { message: 'Category must be at least 2 characters' }),
 		id: z.string().min(2, { message: 'Id must be at least 2 characters' }),
-		quantity: z.string().min(1, { message: 'Quantity must be at least 1' }),
+		// a product with options is stocked per option, so it has no quantity of its own
+		quantity:
+			variants.length > 0
+				? z.string()
+				: z.string().min(1, { message: 'Quantity must be at least 1' }),
 		keepImages: z.string(),
 	});
 
@@ -312,7 +386,7 @@ export const productUpdate = async (
 	}
 
 	const priceInCents = parsePriceToCents(price as string);
-	quantity = parseInt(quantity as string, 10);
+	quantity = variants.length > 0 ? 0 : parseInt(quantity as string, 10);
 
 	// Check if the name is a string
 	if (typeof name !== 'string') {
@@ -340,7 +414,7 @@ export const productUpdate = async (
 		return response;
 	}
 
-	if (typeof quantity !== 'number') {
+	if (typeof quantity !== 'number' || Number.isNaN(quantity)) {
 		response.errors.push('Invalid quantity');
 		return response;
 	}
@@ -404,7 +478,8 @@ export const productUpdate = async (
 		id,
 		{ name, priceInCents, description, categoryId, quantity },
 		keepPaths,
-		addedPaths
+		addedPaths,
+		variants
 	);
 	if (updated instanceof Error) {
 		await deleteObjects(addedPaths);
@@ -415,19 +490,41 @@ export const productUpdate = async (
 	// only now remove the images that were taken off the product
 	await deleteObjects(currentPaths.filter((path) => !keepPaths.includes(path)));
 
+	await logActivity(admin.id, 'PRODUCT', `Edited the product "${name}"`);
+
 	// Revalidate the product page
 	revalidatePath(`/products`, 'layout');
 	revalidatePath(`/products/${id}`, 'layout');
 	revalidatePath(`/products/${id}/edit`, 'layout');
+	// carts may have lost lines when options changed
+	revalidatePath('/cart');
 
 	response.success = true;
 	return response;
 };
 
-//function to get the quantity of a product in stock
-export const getQuantityInStock = async (productId: string) => {
-	const productQuantity = (await getProductQuantityById(productId)) as
-		| number
-		| null;
-	return productQuantity ? productQuantity : null;
+// Stock, price and availability of one cart line (a product, plus its chosen
+// option if it has options), for the guest cart, which lives in the browser. It
+// only says what the product page already shows, so it is public. quantity is
+// null when stock isn't tracked; 0 means sold out.
+export const getProductPurchaseInfo = async (
+	productId: string,
+	variantId = ''
+) => {
+	const info = await getPurchaseInfo(productId, variantId);
+	return info
+		? {
+				quantity: info.quantity,
+				buyable: info.buyable,
+				priceInCents: info.priceInCents,
+				productName: info.productName,
+				variantName: info.variantName,
+			}
+		: {
+				quantity: 0,
+				buyable: false,
+				priceInCents: 0,
+				productName: '',
+				variantName: '',
+			};
 };

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import db from '../db/db';
 import { getCartIdByUserId } from '@/db/cart-db';
+import { signInUrl } from '@/lib/redirects';
 
 const adapter = new PrismaAdapter(db.session, db.user);
 
@@ -90,7 +91,7 @@ export const requireAdminSession = async () => {
 	const result = await verifyAuthSession();
 
 	if (result.user == null) {
-		redirect('/sign-in');
+		redirect(signInUrl('/admin'));
 	}
 
 	if (result.user.role !== 'ADMIN') {

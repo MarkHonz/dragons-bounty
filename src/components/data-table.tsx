@@ -5,6 +5,7 @@ import {
 	ColumnDef,
 	FilterFn,
 	PaginationState,
+	RowData,
 	SortingState,
 	flexRender,
 	getCoreRowModel,
@@ -15,6 +16,7 @@ import {
 } from '@tanstack/react-table';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
 	Table,
@@ -26,6 +28,15 @@ import {
 } from '@/components/ui/table';
 
 const PAGE_SIZE = 10;
+
+declare module '@tanstack/react-table' {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	interface ColumnMeta<TData extends RowData, TValue> {
+		// extra classes for this column's header and cells, e.g. 'hidden sm:table-cell'
+		// to leave a column out on phones
+		className?: string;
+	}
+}
 
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
@@ -123,6 +134,10 @@ export function DataTable<TData, TValue>({
 									return (
 										<TableHead
 											key={header.id}
+											className={cn(
+												'px-1.5 sm:px-4',
+												header.column.columnDef.meta?.className
+											)}
 											aria-sort={
 												sorted === 'asc'
 													? 'ascending'
@@ -153,7 +168,13 @@ export function DataTable<TData, TValue>({
 									data-state={row.getIsSelected() && 'selected'}
 								>
 									{row.getVisibleCells().map((cell) => (
-										<TableCell key={cell.id}>
+										<TableCell
+											key={cell.id}
+											className={cn(
+												'px-1.5 py-2 sm:p-4',
+												cell.column.columnDef.meta?.className
+											)}
+										>
 											{flexRender(cell.column.columnDef.cell, cell.getContext())}
 										</TableCell>
 									))}

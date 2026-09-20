@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { getUserById } from '@/db/user-db';
 import { getOrdersByProfileId, OrderProps } from '@/db/orders-db';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
 	Table,
@@ -14,7 +13,8 @@ import {
 	TableRow,
 } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/formatters';
-import { deleteUserAction } from '@/actions/user-actions';
+import { verifyAuthSession } from '@/lib/auth';
+import AccountControls from './_components/account-controls';
 
 export default async function AdminCustomerDetailPage({
 	params,
@@ -33,6 +33,12 @@ export default async function AdminCustomerDetailPage({
 			</main>
 		);
 	}
+
+	const { user: sessionUser } = await verifyAuthSession();
+	const orderRows = user.profile?.id
+		? ((await getOrdersByProfileId(user.profile.id)) as OrderProps[])
+		: [];
+	const hasOrders = Array.isArray(orderRows) && orderRows.length > 0;
 
 	const address = user.profile
 		? [
@@ -83,12 +89,14 @@ export default async function AdminCustomerDetailPage({
 						</div>
 					</div>
 
-					<form action={deleteUserAction} className="pt-4">
-						<input type="hidden" name="id" value={user.id} />
-						<Button type="submit" variant="destructive" className="rounded-full">
-							Delete user
-						</Button>
-					</form>
+					<AccountControls
+						userId={user.id}
+						label={user.profile?.name || user.email}
+						isAdmin={user.role === 'ADMIN'}
+						emailVerified={user.emailVerified}
+						isSelf={sessionUser?.id === user.id}
+						hasOrders={hasOrders}
+					/>
 				</CardContent>
 			</Card>
 

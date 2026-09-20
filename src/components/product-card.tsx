@@ -12,6 +12,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/formatters';
 import AddToCartButton from '@/components/add-to-cart-button';
+import { Button } from '@/components/ui/button';
+import { getPriceRange, hasVariants } from '@/lib/variants';
 
 type ProductCardProps = {
 	product: ProductProps;
@@ -21,6 +23,10 @@ type ProductCardProps = {
 export default function ProductCard({ product, cartId }: ProductCardProps) {
 	const imageUrl = process.env.NEXT_PUBLIC_S3_BASE_URL;
 	const cover = getCoverImage(product);
+	const withOptions = hasVariants(product);
+	const range = getPriceRange(product);
+	const allSoldOut =
+		withOptions && product.variants.every((variant) => variant.quantity <= 0);
 
 	return (
 		<Card className="flex h-full flex-col overflow-hidden shadow-warm-sm transition-shadow hover:shadow-warm-md">
@@ -40,6 +46,11 @@ export default function ProductCard({ product, cartId }: ProductCardProps) {
 						</div>
 					)}
 					<Badge className="absolute left-3 top-3">{product.category.name}</Badge>
+					{product.isFeatured && (
+						<Badge variant="secondary" className="absolute right-3 top-3">
+							Featured
+						</Badge>
+					)}
 				</div>
 				<CardHeader className="pb-1.5">
 					<CardTitle className="text-lg">{product.name}</CardTitle>
@@ -50,16 +61,31 @@ export default function ProductCard({ product, cartId }: ProductCardProps) {
 			</Link>
 			<CardFooter className="flex flex-col items-start gap-3 pt-2">
 				<span className="text-lg font-extrabold">
-					{formatCurrency(product.priceInCents / 100)}
+					{range.min === range.max
+						? formatCurrency(range.min / 100)
+						: `From ${formatCurrency(range.min / 100)}`}
 				</span>
-				<AddToCartButton
-					cartId={cartId}
-					productId={product.id}
-					quantity={1}
-					name={product.name}
-					price={product.priceInCents}
-					numberInStock={product.quantity}
-				/>
+				{withOptions ? (
+					// a product with options is chosen on its own page
+					allSoldOut ? (
+						<Button type="button" size="sm" className="max-w-56" disabled>
+							Sold out
+						</Button>
+					) : (
+						<Button asChild size="sm" variant="outline" className="max-w-56">
+							<Link href={`/products/${product.id}`}>Choose options</Link>
+						</Button>
+					)
+				) : (
+					<AddToCartButton
+						cartId={cartId}
+						productId={product.id}
+						quantity={1}
+						name={product.name}
+						price={product.priceInCents}
+						numberInStock={product.quantity}
+					/>
+				)}
 			</CardFooter>
 		</Card>
 	);

@@ -6,10 +6,12 @@ import { redirect } from 'next/navigation';
 
 import {
 	addUserAddress,
+	changeUserRole,
 	createUser,
 	createVerificationToken,
 	deleteUser,
 	findUserByEmail,
+	getOtherAdmins,
 	getUserById,
 	updateUserProfile,
 } from '@/db/user-db';
@@ -21,8 +23,14 @@ import {
 	verifyAuthSession,
 } from '@/lib/auth';
 import { addItemToCart, getCartById, getCartIdByUserId } from '@/db/cart-db';
-import { getProductById, ProductProps } from '@/db/product-db';
-import { sendVerificationEmail } from '@/lib/notifications';
+import { getPurchasableQuantity, getPurchaseInfo } from '@/db/product-db';
+import {
+	sendAdminAddedNoticeEmail,
+	sendRoleChangeEmail,
+	sendVerificationEmail,
+} from '@/lib/notifications';
+import { stripe } from '@/lib/stripe';
+import { logActivity } from '@/db/activity-db';
 
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -32,6 +40,8 @@ export const userSubmit = async (previousState: object, formData: FormData) => {
 	const email = formData.get('email') as string | null;
 	interface CartItem {
 		productId: string;
+		// the chosen option; missing or "" for a product without options
+		variantId?: string;
 		quantity: number;
 	}
 
@@ -118,10 +128,22 @@ export const userSubmit = async (previousState: object, formData: FormData) => {
 		await Promise.all(
 			parsedCartItems.map(async (item: CartItem) => {
 				const productId = item['productId'] as string;
-				const quantity = parseInt(item['quantity'] as unknown as string, 10) || 1;
+				// the browser's copy is untrusted: an option that doesn't fit the
+				// product simply counts as not buyable below
+				const variantId =
+					typeof item.variantId === 'string' ? item.variantId : '';
+				const wanted = parseInt(item['quantity'] as unknown as string, 10) || 1;
+				// a guest cart may hold more than is in stock now; keep what can be bought
+				const quantity = await getPurchasableQuantity(
+					productId,
+					variantId,
+					wanted
+				);
+				if (quantity < 1) return;
 				await addItemToCart({
 					cartId,
 					productId,
+					variantId,
 					quantity,
 				});
 			})
@@ -137,6 +159,8 @@ export const userSubmit = async (previousState: object, formData: FormData) => {
 
 type CartItem = {
 	productId?: string;
+	// the chosen option; missing or "" for a product without options
+	variantId?: string;
 	quantity?: number;
 	name?: string;
 	price?: number;
@@ -209,6 +233,7 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	//type for the cartItems in the database
 	type DatabaseCartItem = {
 		product_id: string;
+		variant_id: string;
 		quantity: number;
 		cart_id: string;
 	};
@@ -223,17 +248,32 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	await Promise.all(
 		localCartItems.map(async (localCartItem) => {
 			if (localCartItem.productId) {
+				const variantId =
+					typeof localCartItem.variantId === 'string'
+						? localCartItem.variantId
+						: '';
 				const itemExists = databaseCartItems.find(
 					(databaseCartItem) =>
-						databaseCartItem.product_id === localCartItem.productId
+						databaseCartItem.product_id === localCartItem.productId &&
+						databaseCartItem.variant_id === variantId
 				);
 				if (itemExists === undefined) {
-					await addItemToCart({
-						cartId: cartId,
-						productId: localCartItem.productId,
-						quantity:
-							parseInt(localCartItem.quantity as unknown as string, 10) || 1,
-					});
+					const wanted =
+						parseInt(localCartItem.quantity as unknown as string, 10) || 1;
+					// keep only what can be bought; skip sold-out items
+					const quantity = await getPurchasableQuantity(
+						localCartItem.productId,
+						variantId,
+						wanted
+					);
+					if (quantity > 0) {
+						await addItemToCart({
+							cartId: cartId,
+							productId: localCartItem.productId,
+							variantId,
+							quantity,
+						});
+					}
 				}
 			}
 		})
@@ -243,20 +283,24 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	await Promise.all(
 		databaseCartItems.map(async (databaseCartItem) => {
 			const itemExists = localCartItems.find(
-				(localCartItem) => localCartItem.productId === databaseCartItem.product_id
+				(localCartItem) =>
+					localCartItem.productId === databaseCartItem.product_id &&
+					(localCartItem.variantId ?? '') === databaseCartItem.variant_id
 			);
 			// make sure the item exists and has a productId
 			if (itemExists === undefined) {
 				// get product info from the database and add it to the response object
 				if (databaseCartItem.product_id) {
-					const product = (await getProductById(
-						databaseCartItem.product_id
-					)) as ProductProps;
+					const info = await getPurchaseInfo(
+						databaseCartItem.product_id,
+						databaseCartItem.variant_id
+					);
 					response.cartItems.push({
 						productId: databaseCartItem.product_id,
+						variantId: databaseCartItem.variant_id,
 						quantity: databaseCartItem.quantity,
-						name: product.name,
-						price: product.priceInCents,
+						name: info?.productName,
+						price: info?.priceInCents,
 					});
 				}
 			}
@@ -268,25 +312,181 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	return response; // Return the response object
 };
 
-export const userDelete = async (id: string) => {
-	try {
-		await assertAdminOrThrow();
-		await deleteUser(id);
-		console.log(`deleted ${id}`);
-		revalidatePath('/', 'layout');
-	} catch (error) {
-		console.log('error:', error);
+// Admin: change a customer's role from their detail page. Every rule is checked
+// here on the server; the buttons on the page only mirror them.
+export const setUserRoleAction = async (userId: string, role: string) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	if (role !== 'ADMIN' && role !== 'USER') {
+		response.errors.push('Invalid role.');
+		return response;
 	}
+	if (typeof userId !== 'string' || !userId) {
+		response.errors.push('Customer not found.');
+		return response;
+	}
+	// nobody changes their own role: it can't lock you out, and stepping down
+	// (or up) is another admin's decision
+	if (admin.id === userId) {
+		response.errors.push("You can't change your own role. Ask another admin.");
+		return response;
+	}
+
+	let result;
+	try {
+		result = await changeUserRole(userId, role, admin.id);
+	} catch (error) {
+		console.error('Failed to change role', error);
+		response.errors.push('Failed to change the role. Please try again.');
+		return response;
+	}
+
+	if (result === 'not-found') {
+		response.errors.push('Customer not found.');
+		return response;
+	}
+	if (result === 'unverified') {
+		response.errors.push(
+			"This account's email address isn't verified, so it can't be made an admin."
+		);
+		return response;
+	}
+	if (result === 'last-admin') {
+		response.errors.push(
+			"This is the last admin, so admin access can't be removed."
+		);
+		return response;
+	}
+
+	if (result === 'changed') {
+		console.log(`[admin] ${admin.id} set the role of ${userId} to ${role}`);
+		const changed = await getUserById(userId);
+		const who = changed?.profile?.name
+			? `${changed.profile.name} (${changed.email})`
+			: (changed?.email ?? userId);
+		await logActivity(
+			admin.id,
+			'CUSTOMER',
+			role === 'ADMIN'
+				? `Made ${who} an admin`
+				: `Removed admin access from ${who}`
+		);
+
+		// tell the person concerned. This happens after the change has been saved
+		// and recorded, and a failure here never undoes either.
+		try {
+			const [target, actor] = await Promise.all([
+				getUserById(userId),
+				getUserById(admin.id),
+			]);
+			if (target) {
+				await sendRoleChangeEmail({
+					name: target.profile?.name ?? 'there',
+					email: target.email,
+					promoted: role === 'ADMIN',
+					changedBy: actor?.profile?.name || actor?.email || 'An admin',
+					adminUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/admin`,
+				});
+			}
+		} catch (error) {
+			console.error('Failed to send role change email', error);
+		}
+
+		// When someone is made an admin, the other admins hear about it too: not the
+		// person who did it (they know) nor the new admin (told above). Each gets
+		// their own email, so no one sees the others' addresses, and one failing
+		// never stops the rest or undoes the change.
+		if (role === 'ADMIN') {
+			try {
+				const [target, actor] = await Promise.all([
+					getUserById(userId),
+					getUserById(admin.id),
+				]);
+				const others = await getOtherAdmins([admin.id, userId]);
+				for (const other of others) {
+					try {
+						await sendAdminAddedNoticeEmail({
+							name: other.name ?? 'there',
+							email: other.email,
+							newAdmin: target?.profile?.name || target?.email || 'Someone',
+							changedBy: actor?.profile?.name || actor?.email || 'An admin',
+							roleHistoryUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/admin/customers/role-history`,
+						});
+					} catch (error) {
+						console.error('Failed to send admin notice email', error);
+					}
+				}
+			} catch (error) {
+				console.error('Failed to notify the other admins', error);
+			}
+		}
+	}
+	revalidatePath('/admin/customers', 'layout');
+	response.success = true;
+	return response;
 };
 
-// admin: delete a customer from their detail page and return to the customer list
-export const deleteUserAction = async (formData: FormData) => {
-	await assertAdminOrThrow();
-	const id = formData.get('id')?.toString();
-	if (id) {
-		await deleteUser(id);
+// Admin: delete a customer from their detail page.
+export const userDeleteAction = async (userId: string) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	if (typeof userId !== 'string' || !userId) {
+		response.errors.push('Customer not found.');
+		return response;
 	}
-	redirect('/admin/customers');
+	if (admin.id === userId) {
+		response.errors.push("You can't delete your own account.");
+		return response;
+	}
+
+	const target = await getUserById(userId);
+	if (!target) {
+		response.errors.push('Customer not found.');
+		return response;
+	}
+	if (target.role === 'ADMIN') {
+		response.errors.push(
+			"Admins can't be deleted. Remove their admin access first."
+		);
+		return response;
+	}
+
+	try {
+		await deleteUser(userId);
+	} catch (error) {
+		// P2003: they have orders, and the shop keeps its order history
+		if ((error as { code?: string }).code === 'P2003') {
+			response.errors.push(
+				"This customer has orders, so they can't be deleted. Their order history has to stay."
+			);
+		} else {
+			console.error('Failed to delete user', error);
+			response.errors.push('Failed to delete the customer. Please try again.');
+		}
+		return response;
+	}
+
+	console.log(`[admin] ${admin.id} deleted the customer ${userId}`);
+	await logActivity(
+		admin.id,
+		'CUSTOMER',
+		`Deleted the customer ${
+			target.profile?.name ? `${target.profile.name} (${target.email})` : target.email
+		}`
+	);
+	revalidatePath('/admin/customers', 'layout');
+	response.success = true;
+	return response;
 };
 
 export const userLogout = async () => {
@@ -294,73 +494,105 @@ export const userLogout = async () => {
 	redirect('/');
 };
 
-// add address to profile
+// Save the checkout shipping address to the signed-in user's profile and onto
+// their payment, so the order later keeps the address that was actually used
+// even if the profile changes.
 export const userAddAddress = async (
 	previousState: object,
 	formData: FormData
 ) => {
-	const address1 = formData.get('address1') as string | null;
-	const address2 = formData.get('address2') as string | null;
-	const city = formData.get('city') as string | null;
-	const state = formData.get('state') as string | null;
-	const zip = formData.get('zip') as string | null;
-	const user = formData.get('user') as string | null;
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
 	};
 
-	// Create a schema for the form data
+	// who is asking comes from the session, never from the form
+	const { user } = await verifyAuthSession();
+	if (user == null) {
+		response.errors.push('You must be signed in to add an address');
+		return response;
+	}
+
 	const schema = z.object({
 		address1: z.string().min(2, { message: 'Address is required' }),
 		address2: z.string().optional(),
 		city: z.string().min(2, { message: 'City is required' }),
 		state: z.string().min(2, { message: 'State is required' }),
 		zip: z.string().min(5, { message: 'Zip is required' }),
-		user: z.string(),
+		paymentIntentId: z
+			.string()
+			.startsWith('pi_', { message: 'Invalid payment' }),
 	});
 
-	try {
-		// Validate the form data
-		schema.parse({
-			address1,
-			address2,
-			city,
-			state,
-			zip,
-			user,
-		});
-	} catch (error) {
-		const { errors } = error as z.ZodError;
-		errors.map((error) => {
-			response.errors.push(error.message);
-		});
+	const parsed = schema.safeParse({
+		address1: formData.get('address1'),
+		address2: formData.get('address2') ?? undefined,
+		city: formData.get('city'),
+		state: formData.get('state'),
+		zip: formData.get('zip'),
+		paymentIntentId: formData.get('paymentIntentId'),
+	});
+	if (!parsed.success) {
+		parsed.error.errors.forEach((error) => response.errors.push(error.message));
 		return response;
 	}
+	const { address1, address2 = '', city, state, zip, paymentIntentId } =
+		parsed.data;
 
-	// Check if the street, city, state, and zip are strings
-	if (
-		typeof address1 !== 'string' ||
-		typeof address2 !== 'string' ||
-		typeof city !== 'string' ||
-		typeof state !== 'string' ||
-		typeof zip !== 'string' ||
-		typeof user !== 'string'
-	) {
-		response.errors.push('Invalid form data');
-		return response;
-	}
-
-	// add the address to the user profile
+	// the payment must belong to this customer and still be open
+	let paymentIntent;
 	try {
-		await addUserAddress(user, address1, address2, city, state, zip);
-		response.success = true;
-		revalidatePath('/', 'layout');
-		return response;
+		paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 	} catch {
+		response.errors.push('Could not find this payment. Please reload the page.');
+		return response;
+	}
+	const stillOpen = [
+		'requires_payment_method',
+		'requires_confirmation',
+		'requires_action',
+	].includes(paymentIntent.status);
+	if (paymentIntent.metadata.user_id !== user.id || !stillOpen) {
+		response.errors.push(
+			'This checkout can no longer be changed. Please reload the page.'
+		);
+		return response;
+	}
+
+	// add the address to the user profile (addUserAddress returns errors
+	// rather than throwing them)
+	const saved = await addUserAddress(user.id, address1, address2, city, state, zip);
+	if (saved instanceof Error) {
 		response.errors.push('Error adding address');
 		return response;
 	}
+
+	// attach it to the payment; the Stripe webhook copies it onto the order
+	const account = await getUserById(user.id);
+	try {
+		await stripe.paymentIntents.update(paymentIntentId, {
+			shipping: {
+				name: account?.profile?.name || account?.email || 'Customer',
+				address: {
+					line1: address1,
+					line2: address2,
+					city,
+					state,
+					postal_code: zip,
+				},
+			},
+		});
+	} catch (error) {
+		console.error('Failed to attach shipping address to payment', error);
+		response.errors.push(
+			'Could not save your shipping details. Please try again.'
+		);
+		return response;
+	}
+
+	response.success = true;
+	revalidatePath('/', 'layout');
+	return response;
 };
 
 // update the signed-in user's own profile/address

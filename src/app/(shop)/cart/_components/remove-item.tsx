@@ -8,11 +8,14 @@ import { XCircle } from 'lucide-react';
 type RemoveItemProps = {
 	cartId: string;
 	productId: string;
+	// the chosen option; "" for a product without options
+	variantId?: string;
 };
 
 export default function RemoveItem({
 	cartId,
 	productId,
+	variantId = '',
 }: RemoveItemProps): JSX.Element {
 	const router = useRouter();
 	const isGuest = cartId === 'guest';
@@ -28,7 +31,11 @@ export default function RemoveItem({
 				localStorage.getItem('cartItems') || '[]'
 			);
 			const updatedCartItems = localCartItems.filter(
-				(item: { productId: string }) => item.productId !== productId
+				(item: { productId: string; variantId?: string }) =>
+					!(
+						item.productId === productId &&
+						(item.variantId ?? '') === variantId
+					)
 			);
 			localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
 			router.refresh();
@@ -44,8 +51,8 @@ export default function RemoveItem({
 
 	return (
 		<form onSubmit={handleRemoveFromCart}>
-			<input type="hidden" name="cartId" value={cartId} />
 			<input type="hidden" name="productId" value={productId} />
+			<input type="hidden" name="variantId" value={variantId} />
 			<Button type="submit" variant="outline" size="icon">
 				<XCircle /* color="red" */ size={20} />
 			</Button>

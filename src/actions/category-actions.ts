@@ -4,9 +4,12 @@ import z from 'zod';
 import { revalidatePath } from 'next/cache';
 
 import { assertAdminOrThrow } from '@/lib/auth';
+import { logActivity } from '@/db/activity-db';
 import {
 	createCategory,
 	deleteCategory,
+	findCategoryById,
+	moveCategory,
 	updateCategory,
 	updateCategoryActive,
 } from '@/db/category-db';
@@ -16,7 +19,7 @@ export const categorySubmit = async (
 	previousState: any,
 	formData: FormData
 ) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const name = formData.get('name') as string | null;
 	const description = formData.get('description') as string | null;
@@ -56,7 +59,13 @@ export const categorySubmit = async (
 	}
 
 	// Create the category
-	await createCategory({ name, description: description || undefined });
+	const created = await createCategory({
+		name,
+		description: description || undefined,
+	});
+	if (!(created instanceof Error)) {
+		await logActivity(admin.id, 'CATEGORY', `Created the category "${name}"`);
+	}
 
 	// Revalidate the category page
 	revalidatePath(`/category`, 'layout');
@@ -66,7 +75,7 @@ export const categorySubmit = async (
 };
 
 export const categoryDelete = async (id: string) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -85,6 +94,12 @@ export const categoryDelete = async (id: string) => {
 		return response;
 	}
 
+	await logActivity(
+		admin.id,
+		'CATEGORY',
+		`Deleted the category "${(deleted as { name: string }).name}"`
+	);
+
 	revalidatePath(`/admin/category`);
 	revalidatePath(`/category`, 'layout');
 	response.success = true;
@@ -92,7 +107,7 @@ export const categoryDelete = async (id: string) => {
 };
 
 export const toggleCategoryActive = async (id: string, isActive: boolean) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -100,7 +115,14 @@ export const toggleCategoryActive = async (id: string, isActive: boolean) => {
 	};
 
 	// Update the category
-	await updateCategoryActive(id, isActive);
+	const updated = await updateCategoryActive(id, isActive);
+	if (!(updated instanceof Error)) {
+		await logActivity(
+			admin.id,
+			'CATEGORY',
+			`${isActive ? 'Activated' : 'Deactivated'} the category "${(updated as { name: string }).name}"`
+		);
+	}
 
 	// Revalidate the category page
 	revalidatePath(`/category`);
@@ -114,7 +136,7 @@ export const categoryUpdate = async (
 	name: string,
 	description?: string
 ) => {
-	await assertAdminOrThrow();
+	const { user: admin } = await assertAdminOrThrow();
 
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
@@ -122,10 +144,57 @@ export const categoryUpdate = async (
 	};
 
 	// Update the category
-	await updateCategory(id, { name, description });
+	const updated = await updateCategory(id, { name, description });
+	if (!(updated instanceof Error)) {
+		await logActivity(admin.id, 'CATEGORY', `Edited the category "${name}"`);
+	}
 
 	// Revalidate the category page
 	revalidatePath(`/category`, 'layout');
+	response.success = true;
+	return response;
+};
+
+// move a category up or down the storefront order
+export const moveCategoryAction = async (
+	id: string,
+	direction: 'up' | 'down'
+) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	if (direction !== 'up' && direction !== 'down') {
+		response.errors.push('Invalid direction');
+		return response;
+	}
+
+	try {
+		const moved = await moveCategory(id, direction);
+		if (!moved) {
+			response.errors.push("This category can't move any further.");
+			return response;
+		}
+	} catch (error) {
+		console.error('Failed to move category', error);
+		response.errors.push('Failed to move the category.');
+		return response;
+	}
+
+	const moved = await findCategoryById(id);
+	await logActivity(
+		admin.id,
+		'CATEGORY',
+		`Moved the category "${moved?.name ?? id}" ${direction}`
+	);
+
+	// the header, the homepage and the category pages all list categories in this order
+	revalidatePath('/', 'layout');
+	revalidatePath('/admin/category');
+
 	response.success = true;
 	return response;
 };

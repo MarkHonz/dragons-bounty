@@ -1,5 +1,6 @@
 import {
 	getAvailableProductsByCategoryId,
+	getFeaturedProducts,
 	ProductProps,
 } from '@/db/product-db';
 import { CategoryProps, findActiveCategories } from '@/db/category-db';
@@ -14,6 +15,7 @@ import { getCartIdForSession } from '@/lib/auth';
 export default async function HomePage() {
 	const categories = (await findActiveCategories()) as CategoryProps[];
 	const cartId = await getCartIdForSession();
+	const featuredProducts = (await getFeaturedProducts()) as ProductProps[];
 
 	const categoryProducts = await Promise.all(
 		categories.map(async (category) => {
@@ -101,6 +103,26 @@ export default async function HomePage() {
 					</Link>
 				))}
 			</div>
+
+			{featuredProducts.length > 0 && (
+				<section
+					id="featured"
+					aria-labelledby="featured-heading"
+					className="mx-auto max-w-[1320px] scroll-mt-24 px-5 py-10 sm:px-10"
+				>
+					<h2
+						id="featured-heading"
+						className="mb-7 font-display text-3xl font-semibold"
+					>
+						Featured
+					</h2>
+					<div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+						{featuredProducts.map((product) => (
+							<ProductCard key={product.id} product={product} cartId={cartId} />
+						))}
+					</div>
+				</section>
+			)}
 
 			{categories.map((category) => (
 				<section

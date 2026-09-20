@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/formatters';
 
-type TotalRow = {
+export type TotalRow = {
 	label: string;
 	value: string;
 	emphasis?: boolean;
@@ -30,3 +31,24 @@ export default function OrderTotals({ rows }: { rows: TotalRow[] }) {
 		</div>
 	);
 }
+
+// The row for a discount code, or nothing when no code was used. A code that took
+// money off shows the amount; one that only made shipping free says so.
+export const discountRows = ({
+	discountCode,
+	discountInCents,
+}: {
+	discountCode?: string | null;
+	discountInCents?: number | null;
+}): TotalRow[] =>
+	discountCode
+		? [
+				{
+					label: `Discount (${discountCode})`,
+					value:
+						discountInCents && discountInCents > 0
+							? `-${formatCurrency(discountInCents / 100)}`
+							: 'Free shipping',
+				},
+			]
+		: [];

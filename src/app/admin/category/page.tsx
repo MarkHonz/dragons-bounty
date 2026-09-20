@@ -3,11 +3,18 @@ import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 
 import { DataTable } from '@/components/data-table';
-import { columns } from './_components/columns';
+import { columns, CategoryRow } from './_components/columns';
 import { CategoryProps, getCategories } from '@/db/category-db';
 
 export default async function CategoryPage() {
-	const categories = (await getCategories()) as CategoryProps[];
+	// getCategories returns them in storefront order, so a category's position is
+	// just its place in the list (inactive ones keep theirs)
+	const all = (await getCategories()) as CategoryProps[];
+	const categories: CategoryRow[] = all.map((category, index) => ({
+		...category,
+		position: index + 1,
+		total: all.length,
+	}));
 	return (
 		<main className="mx-auto max-w-3xl">
 			<header className="mb-6 flex items-center justify-between gap-4">
@@ -25,6 +32,8 @@ export default async function CategoryPage() {
 					<DataTable
 						columns={columns}
 						data={categories}
+						// the storefront order, as chosen with Move up / Move down
+						initialSorting={[{ id: 'position', desc: false }]}
 						searchColumns={['name', 'description']}
 						searchPlaceholder="Search by name or description"
 					/>

@@ -1,3 +1,5 @@
+import { notFound, redirect } from 'next/navigation';
+
 import { Card } from '@/components/ui/card';
 import {
 	Table,
@@ -14,8 +16,12 @@ import {
 	OrderProps,
 } from '@/db/orders-db';
 import { getProductNameById } from '@/db/product-db';
+import { getProfileIdByUserId } from '@/db/user-db';
+import { verifyAuthSession } from '@/lib/auth';
 import { formatCurrency } from '@/lib/formatters';
-import OrderTotals from '@/components/order-totals';
+import { formatVariantLabel } from '@/lib/variants';
+import { signInUrl } from '@/lib/redirects';
+import OrderTotals, { discountRows } from '@/components/order-totals';
 
 type OrderDetailsParams = {
 	params: {
@@ -26,8 +32,21 @@ type OrderDetailsParams = {
 export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 	const { orderSlug } = params;
 
+	// only the customer who placed an order may see it
+	const { user } = await verifyAuthSession();
+	if (user == null) {
+		redirect(signInUrl(`/orders/${orderSlug}`));
+	}
+	const profileId = await getProfileIdByUserId(user.id);
+
 	// get the order details
-	const order = (await getOrderDetails(orderSlug)) as OrderProps;
+	const order = (await getOrderDetails(orderSlug)) as OrderProps | null;
+
+	// someone else's order looks exactly like one that doesn't exist, so this
+	// page can't be used to find out which order ids are real
+	if (!order || order instanceof Error || order.profileId !== profileId) {
+		notFound();
+	}
 
 	// get the order products
 	const orderProducts = (await getOrderProductsByOrderId(
@@ -56,8 +75,10 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 									product.product_id
 								)) as string;
 								return (
-									<TableRow key={product.product_id}>
-										<TableCell>{productName}</TableCell>
+									<TableRow key={`${product.product_id}:${product.variant_id}`}>
+										<TableCell>
+											{formatVariantLabel(productName, product.variantName)}
+										</TableCell>
 										<TableCell>{product.quantity}</TableCell>
 										<TableCell>
 											{formatCurrency(product.priceInCents / 100)}
@@ -80,6 +101,7 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 								label: 'Product Total',
 								value: formatCurrency(order.productTotalInCents / 100),
 							},
+							...discountRows(order),
 							{
 								label: 'Shipping Total',
 								value: formatCurrency(order.shippingTotalInCents / 100),
@@ -96,6 +118,18 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 						]}
 					/>
 				</div>
+				{order.shipToAddress1 && (
+					<div className="mt-4 flex flex-col gap-0.5 border-t border-border pt-4 text-sm">
+						<h2 className="mb-1 font-semibold">Shipping to</h2>
+						{order.shipToName && <p>{order.shipToName}</p>}
+						<p>{order.shipToAddress1}</p>
+						{order.shipToAddress2 && <p>{order.shipToAddress2}</p>}
+						<p>
+							{[order.shipToCity, order.shipToState].filter(Boolean).join(', ')}{' '}
+							{order.shipToZip}
+						</p>
+					</div>
+				)}
 				<div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 text-sm text-muted-foreground">
 					<p>
 						Status:{' '}

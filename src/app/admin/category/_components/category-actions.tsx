@@ -16,9 +16,17 @@ import {
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import CategoryToggleActive from './category-toggle-active';
+import CategoryMove from './category-move';
 
 type Props = {
-	category: { id: string; name: string; isActive: boolean };
+	category: {
+		id: string;
+		name: string;
+		isActive: boolean;
+		// place in the storefront order (1 = first) and how many categories there are
+		position: number;
+		total: number;
+	};
 };
 
 export default function CategoryActions({ category }: Props) {
@@ -50,6 +58,7 @@ export default function CategoryActions({ category }: Props) {
 						<DropdownMenuItem>Edit</DropdownMenuItem>
 					</Link>
 					<CategoryToggleActive category={category} />
+					<CategoryMove category={category} />
 					<DropdownMenuSeparator />
 					<DropdownMenuItem
 						onSelect={() => {

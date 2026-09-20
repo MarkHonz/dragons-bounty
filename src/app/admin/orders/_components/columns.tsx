@@ -6,6 +6,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import SortableHeader from '@/components/sortable-header';
 import Link from 'next/link';
+import { StickyNote } from 'lucide-react';
 
 export const columns: ColumnDef<OrderProps>[] = [
 	{
@@ -35,8 +36,27 @@ export const columns: ColumnDef<OrderProps>[] = [
 			return (
 				<div>
 					<Link href={`/admin/orders/${id}`} className="font-semibold text-primary">
-						{id}
+						{/* phones get the short id the emails use; wider screens the full id */}
+						<span className="sm:hidden">#{id.slice(-8)}</span>
+						<span className="hidden sm:inline">{id}</span>
 					</Link>
+					{/* admins can see at a glance which orders have notes */}
+					{(row.original.noteCount ?? 0) > 0 && (
+						<span
+							className="ml-2 inline-flex items-center gap-0.5 align-middle text-xs text-muted-foreground"
+							title={`${row.original.noteCount} ${row.original.noteCount === 1 ? 'note' : 'notes'}`}
+						>
+							<StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
+							<span aria-hidden="true">{row.original.noteCount}</span>
+							<span className="sr-only">
+								{row.original.noteCount === 1 ? '1 note' : `${row.original.noteCount} notes`}
+							</span>
+						</span>
+					)}
+					{/* the Created At column is hidden on phones, so the date rides along here */}
+					<p className="text-xs text-muted-foreground sm:hidden">
+						{new Date(row.original.createdAt).toLocaleDateString()}
+					</p>
 				</div>
 			);
 		},
@@ -47,6 +67,7 @@ export const columns: ColumnDef<OrderProps>[] = [
 			<SortableHeader column={column} label="Created At" />
 		),
 		sortingFn: 'datetime',
+		meta: { className: 'hidden sm:table-cell' },
 		cell: ({ row }) => {
 			const createdAt = row.getValue('createdAt') as Date;
 			return new Date(createdAt).toLocaleDateString();

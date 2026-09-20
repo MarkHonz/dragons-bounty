@@ -7,12 +7,13 @@ import {
 } from '@/db/user-db';
 import { resendVerificationEmailAction } from '@/actions/user-actions';
 import EditProfileForm from '@/components/forms/edit-profile-form';
+import { signInUrl } from '@/lib/redirects';
 
 export default async function AccountPage() {
 	const { user: sessionUser } = await verifyAuthSession();
 
 	if (sessionUser == null) {
-		redirect('/sign-in');
+		redirect(signInUrl('/account'));
 	}
 
 	const user = await getUserById(sessionUser.id);
