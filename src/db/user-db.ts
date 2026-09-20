@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import db from '@/db/db';
 import { generateVerificationToken } from '@/lib/tokens';
 
@@ -268,6 +269,16 @@ export const findUserByEmail = async (email: string) => {
 		where: { email },
 		include: { profile: {} },
 	});
+};
+
+// The account whose email matches whatever capitals were typed. Sign-in itself
+// compares exactly; this is for telling an account's owner about guessing, where
+// the typed capitals shouldn't matter. `lowerEmail` must already be lower-case.
+export const findUserByEmailIgnoringCase = async (lowerEmail: string) => {
+	const rows = await db.$queryRaw<{ id: string; email: string }[]>(
+		Prisma.sql`SELECT "id", "email" FROM "User" WHERE lower("email") = ${lowerEmail} LIMIT 1`
+	);
+	return rows[0] ?? null;
 };
 
 export const getUserById = async (id: string) => {

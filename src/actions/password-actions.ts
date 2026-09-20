@@ -16,6 +16,12 @@ import {
 	sendPasswordChangedEmail,
 	sendPasswordResetEmail,
 } from '@/lib/notifications';
+import { beginAttempt, clearAttempts } from '@/db/auth-attempts-db';
+import {
+	changePasswordBlockedMessage,
+	normalizeSubject,
+} from '@/lib/attempt-limits';
+import { getClientIp } from '@/lib/client-ip';
 
 type Response = { errors: string[]; success: boolean };
 const newResponse = (): Response => ({ errors: [], success: false });
@@ -66,6 +72,26 @@ export const changePasswordAction = async (
 		response.errors.push('Please enter your current password.');
 		return response;
 	}
+	// Guessing the current password is limited like signing in is: someone who
+	// got hold of a signed-in browser shouldn't be able to try passwords forever.
+	let attempt;
+	try {
+		attempt = await beginAttempt(
+			'CHANGE_PASSWORD',
+			sessionUser.id,
+			getClientIp()
+		);
+	} catch (error) {
+		// if the limit can't be checked, no password is tried without it
+		console.error('Failed to check the password attempt limit', error);
+		response.errors.push('Please try again in a moment.');
+		return response;
+	}
+	if (!attempt.allowed) {
+		response.errors.push(changePasswordBlockedMessage(attempt.retryAfterMs));
+		return response;
+	}
+
 	// an absurdly long "current password" is refused before any hashing work
 	if (current.length > MAX_PASSWORD_LENGTH) {
 		response.errors.push('Your current password is incorrect.');
@@ -78,6 +104,9 @@ export const changePasswordAction = async (
 		return response;
 	}
 
+	// the current password was right, so earlier wrong guesses no longer count
+	await clearAttempts('CHANGE_PASSWORD', sessionUser.id);
+
 	const problem = checkNewPassword(newPassword, confirmation, current);
 	if (problem) {
 		response.errors.push(problem);
@@ -85,6 +114,8 @@ export const changePasswordAction = async (
 	}
 
 	await setUserPassword(user.id, hashUserPassword(newPassword as string));
+	// someone who was paused at sign-in can sign in with the new password at once
+	await clearAttempts('SIGN_IN', normalizeSubject(user.email));
 	// any reset link still in an inbox no longer works
 	await cancelPasswordResetTokens(user.id);
 	// every device is signed out, then this one signs straight back in
@@ -169,6 +200,8 @@ export const resetPasswordAction = async (
 
 	// signed out everywhere, including any thief who was signed in
 	await lucia.invalidateUserSessions(result.userId);
+	// if sign-in was paused for this account, the new password works straight away
+	await clearAttempts('SIGN_IN', normalizeSubject(result.email));
 	await sendChangedNotice(result.name, result.email);
 
 	response.success = true;

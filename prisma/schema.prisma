@@ -266,3 +266,18 @@ model ActivityLog {
   @@index([createdAt])
   @@index([orderId])
 }
+
+// One row for each password guess that went wrong (or that was let through and
+// is still being decided), used to slow guessing down. `subject` is the lower-cased
+// email for sign-in, or the user id for the "current password" box on the Account
+// page. Old rows are deleted after a day; no password is ever stored here.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  kind      String // SIGN_IN | CHANGE_PASSWORD | SIGN_IN_NOTICE (owner emailed about a block)
+  subject   String
+  ip        String   @default("") // "" when the address isn't known
+  createdAt DateTime @default(now())
+
+  @@index([kind, subject, createdAt])
+  @@index([kind, ip, createdAt])
+}

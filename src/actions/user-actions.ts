@@ -11,6 +11,7 @@ import {
 	createVerificationToken,
 	deleteUser,
 	findUserByEmail,
+	findUserByEmailIgnoringCase,
 	getOtherAdmins,
 	getUserById,
 	updateUserProfile,
@@ -28,8 +29,12 @@ import { getPurchasableQuantity, getPurchaseInfo } from '@/db/product-db';
 import {
 	sendAdminAddedNoticeEmail,
 	sendRoleChangeEmail,
+	sendSignInBlockedEmail,
 	sendVerificationEmail,
 } from '@/lib/notifications';
+import { beginAttempt, clearAttempts } from '@/db/auth-attempts-db';
+import { normalizeSubject, signInBlockedMessage } from '@/lib/attempt-limits';
+import { getClientIp } from '@/lib/client-ip';
 import { stripe } from '@/lib/stripe';
 import { logActivity } from '@/db/activity-db';
 
@@ -178,6 +183,24 @@ type CartItem = {
 	price?: number;
 };
 
+// Tell an account's owner that sign-in for it was paused. Never throws: it runs
+// in the background of a refused sign-in.
+const notifySignInBlocked = async (typedEmail: string) => {
+	try {
+		// the address may have been typed in different capitals from how it was saved
+		const user = await findUserByEmailIgnoringCase(normalizeSubject(typedEmail));
+		if (!user) return;
+		const full = await getUserById(user.id);
+		await sendSignInBlockedEmail({
+			name: full?.profile?.name ?? 'there',
+			email: user.email,
+			forgotPasswordUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/forgot-password`,
+		});
+	} catch (error) {
+		console.error('Failed to send the sign-in paused email', error);
+	}
+};
+
 export const userLogin = async (previousState: object, formData: FormData) => {
 	const email = formData.get('email') as string | null;
 	const password = formData.get('password') as string | null;
@@ -194,8 +217,11 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 
 	// Create a schema for the form data
 	const schema = z.object({
-		email: z.string().email(),
-		password: z.string().min(6),
+		// capped, because the email typed is remembered for a day to slow guessing
+		// down, and nobody's address is longer than this
+		email: z.string().email().max(254),
+		// no account has a longer password than this (sign-up caps it at 128)
+		password: z.string().min(6).max(1024),
 		sentCartItems: z.string().optional(),
 	});
 
@@ -218,6 +244,32 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 		response.errors.push('Email is required');
 		return response;
 	}
+
+	// Slow down guessing: after a few wrong passwords sign-in is paused for a
+	// while. This comes before any password checking, so it is cheap to refuse a
+	// flood, and unknown emails are limited in exactly the same way as real ones.
+	const subject = normalizeSubject(email);
+	let attempt;
+	try {
+		attempt = await beginAttempt('SIGN_IN', subject, getClientIp());
+	} catch (error) {
+		// if the limit can't be checked, nobody is let in without it
+		console.error('Failed to check the sign-in limit', error);
+		response.errors.push(
+			'Sign-in is unavailable for a moment. Please try again.'
+		);
+		return response;
+	}
+	if (!attempt.allowed) {
+		if (attempt.notifyOwner) {
+			// not awaited: whether an email is sent must not change how long the
+			// answer takes, or it would give away which accounts exist
+			void notifySignInBlocked(email);
+		}
+		response.errors.push(signInBlockedMessage(attempt.retryAfterMs));
+		return response;
+	}
+
 	const user = await findUserByEmail(email);
 	if (user == null) {
 		// spend the same time a real check would
@@ -235,6 +287,9 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 		response.errors.push(SIGN_IN_FAILED);
 		return response;
 	}
+
+	// the right password: the wrong guesses made before it no longer count
+	await clearAttempts('SIGN_IN', subject);
 
 	await createAuthSession(user.id); // Create a session for the user
 

@@ -10,6 +10,7 @@ import { buildRoleChangeEmail } from '@/lib/emails/role-change-email';
 import { buildAdminAddedNoticeEmail } from '@/lib/emails/admin-added-notice-email';
 import { buildPasswordResetEmail } from '@/lib/emails/password-reset-email';
 import { buildPasswordChangedEmail } from '@/lib/emails/password-changed-email';
+import { buildSignInBlockedEmail } from '@/lib/emails/sign-in-blocked-email';
 
 type SendVerificationEmailProps = {
 	name: string;
@@ -190,6 +191,22 @@ export const sendPasswordChangedEmail = async ({
 	forgotPasswordUrl: string;
 }) => {
 	const { subject, html, text } = buildPasswordChangedEmail({
+		name,
+		forgotPasswordUrl,
+	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+export const sendSignInBlockedEmail = async ({
+	name,
+	email,
+	forgotPasswordUrl,
+}: {
+	name: string;
+	email: string;
+	forgotPasswordUrl: string;
+}) => {
+	const { subject, html, text } = buildSignInBlockedEmail({
 		name,
 		forgotPasswordUrl,
 	});
