@@ -22,7 +22,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
 	]);
 
 	return (
-		<main className="mx-auto max-w-4xl">
+		<main className="mx-auto max-w-5xl">
 			<header className="mb-6 flex items-center justify-between gap-4">
 				<h1 className="font-display text-3xl font-semibold">Orders</h1>
 				{counts.all > 0 && (
@@ -76,8 +76,8 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
 							key={status ?? 'all'}
 							columns={columns}
 							data={orders}
-							searchColumns={['id']}
-							searchPlaceholder="Search by order ID"
+							searchColumns={['id', 'customerEmail']}
+							searchPlaceholder="Search by order ID or email"
 							// newest orders first
 							initialSorting={[{ id: 'createdAt', desc: true }]}
 						/>

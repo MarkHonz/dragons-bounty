@@ -19,8 +19,10 @@ export type OrderProps = {
 	fulfilled?: boolean;
 	trackingNumber?: string;
 	stripePaymentIntentId?: string | null;
-	// how many admin notes the order has (only set by the admin orders list)
+	// how many admin notes the order has, and the customer's email (both only
+	// set by the admin orders list)
 	noteCount?: number;
+	customerEmail?: string;
 	refundedAt?: Date | null;
 	refundedAmountInCents?: number | null;
 	stripeRefundId?: string | null;
@@ -169,17 +171,22 @@ export const parseOrderStatusFilter = (
 	ORDER_STATUS_FILTERS.find((status) => status === value);
 
 // get all orders, newest first, optionally only those in one state, each with
-// how many admin notes it has
+// how many admin notes it has and the customer's email. Only the email is taken
+// from the account: this list goes to a client component.
 export const getOrders = async (status?: OrderStatusFilter) => {
 	try {
 		const orders = await db.order.findMany({
 			where: status ? orderStatusWhere[status] : undefined,
 			orderBy: { createdAt: 'desc' },
-			include: { _count: { select: { notes: true } } },
+			include: {
+				_count: { select: { notes: true } },
+				profile: { select: { user: { select: { email: true } } } },
+			},
 		});
-		return orders.map(({ _count, ...order }) => ({
+		return orders.map(({ _count, profile, ...order }) => ({
 			...order,
 			noteCount: _count.notes,
+			customerEmail: profile.user.email,
 		}));
 	} catch (error) {
 		return error;

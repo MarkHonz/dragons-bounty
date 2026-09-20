@@ -20,7 +20,9 @@ export const columns: ColumnDef<OrderProps>[] = [
 
 			return (
 				<Badge
-					variant={rank === 2 ? 'destructive' : rank === 1 ? 'secondary' : 'outline'}
+					variant={
+						rank === 2 ? 'destructive' : rank === 1 ? 'secondary' : 'outline'
+					}
 				>
 					{rank === 2 ? 'Refunded' : rank === 1 ? 'Fulfilled' : 'Processing'}
 				</Badge>
@@ -35,10 +37,13 @@ export const columns: ColumnDef<OrderProps>[] = [
 			const id = row.getValue('id') as string;
 			return (
 				<div>
-					<Link href={`/admin/orders/${id}`} className="font-semibold text-primary">
-						{/* phones get the short id the emails use; wider screens the full id */}
-						<span className="sm:hidden">#{id.slice(-8)}</span>
-						<span className="hidden sm:inline">{id}</span>
+					<Link
+						href={`/admin/orders/${id}`}
+						className="font-semibold text-primary"
+					>
+						{/* narrower screens get the short id the emails use, leaving room for the email; wide screens the full id */}
+						<span className="lg:hidden">#{id.slice(-8)}</span>
+						<span className="hidden lg:inline">{id}</span>
 					</Link>
 					{/* admins can see at a glance which orders have notes */}
 					{(row.original.noteCount ?? 0) > 0 && (
@@ -49,17 +54,34 @@ export const columns: ColumnDef<OrderProps>[] = [
 							<StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
 							<span aria-hidden="true">{row.original.noteCount}</span>
 							<span className="sr-only">
-								{row.original.noteCount === 1 ? '1 note' : `${row.original.noteCount} notes`}
+								{row.original.noteCount === 1
+									? '1 note'
+									: `${row.original.noteCount} notes`}
 							</span>
 						</span>
 					)}
-					{/* the Created At column is hidden on phones, so the date rides along here */}
+					{/* the Email and Created At columns are hidden on phones, so they ride along here */}
+					<p className="break-all text-xs text-muted-foreground sm:hidden">
+						{row.original.customerEmail}
+					</p>
 					<p className="text-xs text-muted-foreground sm:hidden">
 						{new Date(row.original.createdAt).toLocaleDateString()}
 					</p>
 				</div>
 			);
 		},
+	},
+	{
+		accessorKey: 'customerEmail',
+		header: ({ column }) => <SortableHeader column={column} label="Email" />,
+		sortingFn: 'alphanumeric',
+		meta: { className: 'hidden sm:table-cell' },
+		cell: ({ row }) => (
+			// a sensible minimum width, so a normal address stays on one line
+			<span className="block min-w-[12rem] break-all">
+				{row.original.customerEmail}
+			</span>
+		),
 	},
 	{
 		accessorKey: 'createdAt',
