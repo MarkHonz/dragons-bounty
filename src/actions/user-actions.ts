@@ -16,6 +16,7 @@ import {
 	updateUserProfile,
 } from '@/db/user-db';
 import { hashUserPassword, verifyPassword } from '@/lib/hash';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/password-rules';
 import {
 	assertAdminOrThrow,
 	createAuthSession,
@@ -33,6 +34,12 @@ import { stripe } from '@/lib/stripe';
 import { logActivity } from '@/db/activity-db';
 
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
+// Signing in gives the same answer for an unknown email and a wrong password, so
+// it can't be used to find out who has an account. A hash to check against when
+// there is no such account keeps the two cases equally slow.
+const SIGN_IN_FAILED = 'Incorrect email or password';
+const NO_ACCOUNT_HASH = hashUserPassword('no account has this password');
 
 export const userSubmit = async (previousState: object, formData: FormData) => {
 	const name = formData.get('name') as string | null;
@@ -56,7 +63,12 @@ export const userSubmit = async (previousState: object, formData: FormData) => {
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
 		password: z
 			.string()
-			.min(6, { message: 'Password must be at least 6 characters' }),
+			.min(MIN_PASSWORD_LENGTH, {
+				message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+			})
+			.max(MAX_PASSWORD_LENGTH, {
+				message: `Password must be ${MAX_PASSWORD_LENGTH} characters or fewer`,
+			}),
 		email: z.string().email(),
 		cartItems: z.string().optional(),
 	});
@@ -208,7 +220,9 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	}
 	const user = await findUserByEmail(email);
 	if (user == null) {
-		response.errors.push('User not found');
+		// spend the same time a real check would
+		verifyPassword(NO_ACCOUNT_HASH, password as string);
+		response.errors.push(SIGN_IN_FAILED);
 		return response;
 	}
 
@@ -218,7 +232,7 @@ export const userLogin = async (previousState: object, formData: FormData) => {
 	}
 	const isValid = verifyPassword(user.password, password);
 	if (isValid == false) {
-		response.errors.push('Invalid password');
+		response.errors.push(SIGN_IN_FAILED);
 		return response;
 	}
 

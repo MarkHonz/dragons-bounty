@@ -248,6 +248,14 @@ export const getOtherAdmins = async (excludeIds: string[]) => {
 	}));
 };
 
+// Replace a user's password with an already-hashed one.
+export const setUserPassword = async (userId: string, hashedPassword: string) => {
+	await db.user.update({
+		where: { id: userId },
+		data: { password: hashedPassword },
+	});
+};
+
 export const deleteUser = async (id: string) => {
 	return await db.user.delete({
 		where: { id: id },

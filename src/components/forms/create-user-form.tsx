@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { safeRedirectPath } from '@/lib/redirects';
 import { useHydrated } from '@/lib/use-hydrated';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/password-rules';
 
 const formSchema = z // create a schema for the form data
 	.object({
@@ -26,7 +27,12 @@ const formSchema = z // create a schema for the form data
 		email: z.string().email(),
 		password: z
 			.string()
-			.min(6, { message: 'Password must be at least 6 characters' })
+			.min(MIN_PASSWORD_LENGTH, {
+				message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+			})
+			.max(MAX_PASSWORD_LENGTH, {
+				message: `Password must be ${MAX_PASSWORD_LENGTH} characters or fewer`,
+			})
 			.max(50),
 		passwordconfirm: z.string(),
 	})

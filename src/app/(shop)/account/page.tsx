@@ -7,6 +7,7 @@ import {
 } from '@/db/user-db';
 import { resendVerificationEmailAction } from '@/actions/user-actions';
 import EditProfileForm from '@/components/forms/edit-profile-form';
+import ChangePasswordForm from '@/components/forms/change-password-form';
 import { signInUrl } from '@/lib/redirects';
 
 export default async function AccountPage() {
@@ -47,6 +48,7 @@ export default async function AccountPage() {
 					zip: address?.zip ?? '',
 				}}
 			/>
+			<ChangePasswordForm />
 		</main>
 	);
 }

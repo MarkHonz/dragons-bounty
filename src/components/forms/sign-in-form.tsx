@@ -35,11 +35,18 @@ type Inputs = z.infer<typeof formSchema>;
 type SignInFormProps = {
 	// where to go after signing in; without it the person goes back to the page they came from
 	next?: string | null;
+	// true right after a password reset, to say so
+	passwordWasReset?: boolean;
 };
 
-export default function SignInForm({ next }: SignInFormProps) {
+export default function SignInForm({
+	next,
+	passwordWasReset = false,
+}: SignInFormProps) {
 	const router = useRouter();
 	const [showPassword, setShowPassword] = useState(false);
+	// what the server said when sign-in didn't work
+	const [signInError, setSignInError] = useState('');
 	// keeps Submit disabled until the form's JavaScript is running (see useHydrated)
 	const hydrated = useHydrated();
 	const form = useForm<Inputs>({
@@ -62,23 +69,32 @@ export default function SignInForm({ next }: SignInFormProps) {
 		// add cartItems to formData as an array of objects
 		formData.append('cartItems', JSON.stringify(cartItems));
 
+		setSignInError('');
 		const result = await userLogin({}, formData);
 
-		if (result.success) {
-			// the guest cart has now been merged into the DB cart server-side;
-			// clear the local copy since the DB is authoritative from here on
-			localStorage.removeItem('cartItems');
-			localStorage.removeItem('cartId');
-			// check again here even though the page already did: this must never
-			// send anyone to another site
-			const destination = safeRedirectPath(next);
-			if (destination) {
-				router.push(destination);
-			} else {
-				router.back();
-			}
-			router.refresh();
+		if (!result.success) {
+			setSignInError(
+				result.errors.join(' ') || 'Sign-in failed. Please try again.'
+			);
+			return;
 		}
+
+		// the guest cart has now been merged into the DB cart server-side;
+		// clear the local copy since the DB is authoritative from here on
+		localStorage.removeItem('cartItems');
+		localStorage.removeItem('cartId');
+		// check again here even though the page already did: this must never
+		// send anyone to another site
+		const destination = safeRedirectPath(next);
+		if (destination) {
+			router.push(destination);
+		} else if (passwordWasReset) {
+			// "back" would be the reset link the person just used up
+			router.push('/');
+		} else {
+			router.back();
+		}
+		router.refresh();
 	};
 
 	return (
@@ -94,6 +110,16 @@ export default function SignInForm({ next }: SignInFormProps) {
 					onSubmit={form.handleSubmit(handleSubmit)}
 				>
 					<CardContent className="flex flex-col gap-2">
+						{passwordWasReset && (
+							<p className="text-sm font-medium text-primary" role="status">
+								Your password was updated. Please sign in with the new one.
+							</p>
+						)}
+						{signInError && (
+							<p className="text-sm font-medium text-destructive" role="alert">
+								{signInError}
+							</p>
+						)}
 						<FormMessage>
 							{/* // display error messages here */}
 							{Object.keys(form.formState.errors).length > 0 && (
@@ -161,6 +187,12 @@ export default function SignInForm({ next }: SignInFormProps) {
 								}}
 							/>
 						</fieldset>
+						<Link
+							className="self-end pr-2 text-sm text-primary"
+							href="/forgot-password"
+						>
+							Forgot password?
+						</Link>
 						<Button type="submit" className="rounded-full" disabled={!hydrated}>
 							Submit
 						</Button>

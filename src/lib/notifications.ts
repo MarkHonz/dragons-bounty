@@ -8,6 +8,8 @@ import { buildShippingUpdateEmail } from '@/lib/emails/shipping-update-email';
 import { buildRefundEmail } from '@/lib/emails/refund-email';
 import { buildRoleChangeEmail } from '@/lib/emails/role-change-email';
 import { buildAdminAddedNoticeEmail } from '@/lib/emails/admin-added-notice-email';
+import { buildPasswordResetEmail } from '@/lib/emails/password-reset-email';
+import { buildPasswordChangedEmail } from '@/lib/emails/password-changed-email';
 
 type SendVerificationEmailProps = {
 	name: string;
@@ -161,6 +163,35 @@ export const sendAdminAddedNoticeEmail = async ({
 		newAdmin,
 		changedBy,
 		roleHistoryUrl,
+	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+export const sendPasswordResetEmail = async ({
+	name,
+	email,
+	resetUrl,
+}: {
+	name: string;
+	email: string;
+	resetUrl: string;
+}) => {
+	const { subject, html, text } = buildPasswordResetEmail({ name, resetUrl });
+	return sendEmail({ to: email, subject, html, text });
+};
+
+export const sendPasswordChangedEmail = async ({
+	name,
+	email,
+	forgotPasswordUrl,
+}: {
+	name: string;
+	email: string;
+	forgotPasswordUrl: string;
+}) => {
+	const { subject, html, text } = buildPasswordChangedEmail({
+		name,
+		forgotPasswordUrl,
 	});
 	return sendEmail({ to: email, subject, html, text });
 };
