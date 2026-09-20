@@ -10,7 +10,7 @@ import {
 	useElements,
 	useStripe,
 } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, type Appearance } from '@stripe/stripe-js';
 
 import {
 	Form,
@@ -31,7 +31,7 @@ import {
 	CardTitle,
 } from '../ui/card';
 import { formatCurrency } from '@/lib/formatters';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { userAddAddress } from '@/actions/user-actions';
 
 const formSchema = z // create a schema for the form data
@@ -55,6 +55,41 @@ const stripePromise = loadStripe(
 	process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY as string
 );
 
+// One of the site's color variables (they are written in oklch, which Stripe
+// doesn't accept) as a plain rgb() color, or null if it can't be read.
+const tokenToRgb = (token: string): string | null => {
+	const value = getComputedStyle(document.documentElement)
+		.getPropertyValue(token)
+		.trim();
+	const context = document.createElement('canvas').getContext('2d');
+	if (!value || !context) return null;
+	// an invalid color is ignored by the canvas, leaving the marker in place
+	context.fillStyle = '#010203';
+	context.fillStyle = value;
+	if (context.fillStyle === '#010203') return null;
+	context.fillRect(0, 0, 1, 1);
+	const pixel = context.getImageData(0, 0, 1, 1).data;
+	return `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+};
+
+// Stripe draws the payment box inside its own iframe, so the page's CSS (and
+// dark mode) can't reach it: left alone it uses dark text, which vanishes on the
+// dark card. This hands it the site's own colors for whichever theme is showing.
+const buildStripeAppearance = (): Appearance => {
+	const dark = document.documentElement.classList.contains('dark');
+	const colors = {
+		colorBackground: tokenToRgb('--background'),
+		colorText: tokenToRgb('--foreground'),
+		colorTextSecondary: tokenToRgb('--muted-foreground'),
+		colorTextPlaceholder: tokenToRgb('--muted-foreground'),
+		colorPrimary: tokenToRgb('--primary'),
+	};
+	const variables = Object.fromEntries(
+		Object.entries(colors).filter(([, color]) => color !== null)
+	);
+	return { theme: dark ? 'night' : 'stripe', variables };
+};
+
 export default function AddAddressForm({
 	clientSecret,
 	orderTotal,
@@ -66,6 +101,19 @@ export default function AddAddressForm({
 	};
 	// create state for response
 	const [responseState, setResponseState] = useState(response);
+	// the payment box follows the site's light/dark theme, including when it is
+	// switched while the box is open (the theme is a class on <html>)
+	const [appearance, setAppearance] = useState<Appearance>();
+	useEffect(() => {
+		const update = () => setAppearance(buildStripeAppearance());
+		update();
+		const observer = new MutationObserver(update);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class'],
+		});
+		return () => observer.disconnect();
+	}, []);
 	const form = useForm<Inputs>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -196,7 +244,7 @@ export default function AddAddressForm({
 			</div>
 			<div>
 				{responseState.success ? (
-					<Elements options={{ clientSecret }} stripe={stripePromise}>
+					<Elements options={{ clientSecret, appearance }} stripe={stripePromise}>
 						<StripeCheckoutForm orderTotal={orderTotal} />
 					</Elements>
 				) : (
