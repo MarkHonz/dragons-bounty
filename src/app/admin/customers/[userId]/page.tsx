@@ -146,7 +146,7 @@ async function UserOrders({ profileId }: { profileId: string }) {
 									href={`/admin/orders/${order.id}`}
 									className="font-semibold text-primary"
 								>
-									#{order.id.slice(0, 8)}
+									#{order.id.slice(-8)}
 								</Link>
 							</TableCell>
 							<TableCell>

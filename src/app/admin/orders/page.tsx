@@ -77,7 +77,7 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
 							columns={columns}
 							data={orders}
 							searchColumns={['id', 'customerEmail']}
-							searchPlaceholder="Search by order ID or email"
+							searchPlaceholder="Search by order # or email"
 							// newest orders first
 							initialSorting={[{ id: 'createdAt', desc: true }]}
 						/>

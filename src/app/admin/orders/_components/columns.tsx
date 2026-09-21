@@ -30,20 +30,21 @@ export const columns: ColumnDef<OrderProps>[] = [
 		},
 	},
 	{
-		accessorKey: 'id',
-		header: ({ column }) => <SortableHeader column={column} label="Order ID" />,
+		id: 'id',
+		// the order number customers see on their Account page and in emails; the
+		// search box looks at this value too, so "#" and the number both find it
+		accessorFn: (order) => `#${order.id.slice(-8)}`,
+		header: ({ column }) => <SortableHeader column={column} label="Order #" />,
 		sortingFn: 'alphanumeric',
 		cell: ({ row }) => {
-			const id = row.getValue('id') as string;
+			const { id } = row.original;
 			return (
 				<div>
 					<Link
 						href={`/admin/orders/${id}`}
 						className="font-semibold text-primary"
 					>
-						{/* narrower screens get the short id the emails use, leaving room for the email; wide screens the full id */}
-						<span className="lg:hidden">#{id.slice(-8)}</span>
-						<span className="hidden lg:inline">{id}</span>
+						{row.getValue('id') as string}
 					</Link>
 					{/* admins can see at a glance which orders have notes */}
 					{(row.original.noteCount ?? 0) > 0 && (

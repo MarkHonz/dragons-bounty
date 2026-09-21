@@ -60,9 +60,9 @@ export default async function OrdersPage() {
 							</div>
 							<Link
 								href={`/orders/${order.id}`}
-								className="break-all text-sm text-primary underline"
+								className="text-sm text-primary underline"
 							>
-								{order.id}
+								#{order.id.slice(-8)}
 							</Link>
 							<span className="font-semibold">
 								{formatCurrency(order.totalInCents / 100)}
@@ -85,7 +85,7 @@ export default async function OrdersPage() {
 								<TableRow key={order.id}>
 									<TableCell>{order.createdAt.toLocaleDateString()}</TableCell>
 									<TableCell>
-										{<Link href={`/orders/${order.id}`}>{order.id}</Link>}
+										<Link href={`/orders/${order.id}`}>#{order.id.slice(-8)}</Link>
 									</TableCell>
 									<TableCell>
 										{formatCurrency(order.totalInCents / 100)}
