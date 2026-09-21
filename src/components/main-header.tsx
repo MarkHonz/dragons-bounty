@@ -51,7 +51,7 @@ export default async function MainHeader() {
 					<div className="flex items-center gap-4">
 						<Link
 							href="/"
-							className="hidden whitespace-nowrap font-display text-xl font-semibold sm:inline-block md:text-[2.5rem]"
+							className="hidden whitespace-nowrap font-display text-xl font-semibold sm:inline-block md:text-3xl lg:text-[2.5rem]"
 						>
 							Dragon&apos;s Bounty
 						</Link>

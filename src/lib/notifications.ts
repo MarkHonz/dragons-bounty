@@ -11,6 +11,9 @@ import { buildAdminAddedNoticeEmail } from '@/lib/emails/admin-added-notice-emai
 import { buildPasswordResetEmail } from '@/lib/emails/password-reset-email';
 import { buildPasswordChangedEmail } from '@/lib/emails/password-changed-email';
 import { buildSignInBlockedEmail } from '@/lib/emails/sign-in-blocked-email';
+import { buildEmailChangeConfirmEmail } from '@/lib/emails/email-change-confirm-email';
+import { buildEmailChangeRequestedEmail } from '@/lib/emails/email-change-requested-email';
+import { buildEmailChangedEmail } from '@/lib/emails/email-changed-email';
 
 type SendVerificationEmailProps = {
 	name: string;
@@ -208,6 +211,57 @@ export const sendSignInBlockedEmail = async ({
 }) => {
 	const { subject, html, text } = buildSignInBlockedEmail({
 		name,
+		forgotPasswordUrl,
+	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+export const sendEmailChangeConfirmEmail = async ({
+	name,
+	email,
+	confirmUrl,
+}: {
+	name: string;
+	email: string;
+	confirmUrl: string;
+}) => {
+	const { subject, html, text } = buildEmailChangeConfirmEmail({ name, confirmUrl });
+	return sendEmail({ to: email, subject, html, text });
+};
+
+export const sendEmailChangeRequestedEmail = async ({
+	name,
+	email,
+	maskedNewEmail,
+	forgotPasswordUrl,
+}: {
+	name: string;
+	email: string;
+	maskedNewEmail: string;
+	forgotPasswordUrl: string;
+}) => {
+	const { subject, html, text } = buildEmailChangeRequestedEmail({
+		name,
+		maskedNewEmail,
+		forgotPasswordUrl,
+	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+export const sendEmailChangedEmail = async ({
+	name,
+	email,
+	maskedNewEmail,
+	forgotPasswordUrl,
+}: {
+	name: string;
+	email: string;
+	maskedNewEmail: string;
+	forgotPasswordUrl: string;
+}) => {
+	const { subject, html, text } = buildEmailChangedEmail({
+		name,
+		maskedNewEmail,
 		forgotPasswordUrl,
 	});
 	return sendEmail({ to: email, subject, html, text });

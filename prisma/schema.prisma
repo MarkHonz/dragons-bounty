@@ -55,6 +55,7 @@ model VerificationToken {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
+  newEmail  String? // for EMAIL_CHANGE tokens: the address the account is asking to change to
 }
 
 model Session {

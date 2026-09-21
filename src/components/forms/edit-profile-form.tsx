@@ -1,166 +1,112 @@
 'use client';
 
-import * as z from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, SubmitHandler } from 'react-hook-form';
 import { useState } from 'react';
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { userUpdateProfile } from '@/actions/user-actions';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+	checkProfile,
+	cleanProfile,
+	MAX_FIELD_LENGTH,
+	ProfileInput,
+} from '@/lib/profile-rules';
+import { useHydrated } from '@/lib/use-hydrated';
 
-const formSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters'),
-	address1: z.string().min(2, 'Address is required'),
-	address2: z.string().optional(),
-	city: z.string().min(2, 'City is required'),
-	state: z.string().min(2, 'State is required'),
-	zip: z.string().min(5, 'Zip code is required'),
-});
+// The fields of the profile, in the order they are shown
+const FIELDS: {
+	name: keyof ProfileInput;
+	label: string;
+	placeholder: string;
+}[] = [
+	{ name: 'name', label: 'Name', placeholder: 'name' },
+	{ name: 'address1', label: 'Address 1', placeholder: 'address1' },
+	{ name: 'address2', label: 'Address 2', placeholder: 'address2' },
+	{ name: 'city', label: 'City', placeholder: 'city' },
+	{ name: 'state', label: 'State', placeholder: 'state' },
+	{ name: 'zip', label: 'Zip Code', placeholder: 'zip' },
+];
 
-type Inputs = z.infer<typeof formSchema>;
-
-type EditProfileFormProps = {
-	defaultValues: Inputs;
-};
-
+// The name and shipping address, for the Account page's Edit dialog. The name is
+// required; the address is optional but all-or-nothing (leave it blank to clear it).
 export default function EditProfileForm({
 	defaultValues,
-}: EditProfileFormProps) {
-	const [responseState, setResponseState] = useState<{
-		errors: string[];
-		success: boolean;
-	}>({ errors: [], success: false });
+	onSaved,
+}: {
+	defaultValues: ProfileInput;
+	onSaved?: () => void;
+}) {
+	// keeps Save disabled until the form's JavaScript is running
+	const hydrated = useHydrated();
+	const [values, setValues] = useState<ProfileInput>(defaultValues);
+	const [errors, setErrors] = useState<string[]>([]);
+	const [saving, setSaving] = useState(false);
 
-	const form = useForm<Inputs>({
-		resolver: zodResolver(formSchema),
-		defaultValues,
-	});
-
-	const handleSubmit: SubmitHandler<Inputs> = async (data) => {
+	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		const details = cleanProfile(values);
+		const problems = checkProfile(details);
+		if (problems.length > 0) {
+			setErrors(problems);
+			return;
+		}
 		const formData = new FormData();
-		Object.entries(data).forEach(([key, value]) => {
-			formData.append(key, value ?? '');
-		});
-
-		setResponseState(await userUpdateProfile({}, formData));
+		Object.entries(details).forEach(([key, value]) =>
+			formData.append(key, value)
+		);
+		setSaving(true);
+		setErrors([]);
+		const result = await userUpdateProfile({}, formData);
+		setSaving(false);
+		if (!result.success) {
+			setErrors(result.errors);
+			return;
+		}
+		onSaved?.();
 	};
 
 	return (
-		<Form {...form}>
-			<Card className="m-auto w-full max-w-md shadow-warm-sm">
-				<CardHeader>
-					<CardTitle className="text-center font-display text-2xl">
-						Edit Profile
-					</CardTitle>
-				</CardHeader>
-				<form
-					className="flex flex-col gap-2"
-					onSubmit={form.handleSubmit(handleSubmit)}
-				>
-					<CardContent className="flex flex-col gap-2">
-					{responseState.success && (
-						<p className="text-center text-green-700">Profile updated.</p>
-					)}
-					{responseState.errors.length > 0 && (
-						<div className="text-center text-red-700">
-							{responseState.errors.map((error) => (
-								<div key={error}>{error}</div>
-							))}
-						</div>
-					)}
-					<FormField
-					control={form.control}
-					name="name"
-					render={({ field }) => (
-						<FormItem>
-							<FormLabel className="pl-2">Name</FormLabel>
-							<FormControl>
-								<Input placeholder="name" type="text" {...field} />
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-				<FormField
-					control={form.control}
-					name="address1"
-					render={({ field }) => (
-						<FormItem>
-							<FormLabel className="pl-2">Address 1</FormLabel>
-							<FormControl>
-								<Input placeholder="address1" type="text" {...field} />
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-				<FormField
-					control={form.control}
-					name="address2"
-					render={({ field }) => (
-						<FormItem>
-							<FormLabel className="pl-2">Address 2</FormLabel>
-							<FormControl>
-								<Input placeholder="address2" type="text" {...field} />
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-				<FormField
-					control={form.control}
-					name="city"
-					render={({ field }) => (
-						<FormItem>
-							<FormLabel className="pl-2">City</FormLabel>
-							<FormControl>
-								<Input placeholder="city" type="text" {...field} />
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-				<FormField
-					control={form.control}
-					name="state"
-					render={({ field }) => (
-						<FormItem>
-							<FormLabel className="pl-2">State</FormLabel>
-							<FormControl>
-								<Input placeholder="state" type="text" {...field} />
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-				<FormField
-					control={form.control}
-					name="zip"
-					render={({ field }) => (
-						<FormItem>
-							<FormLabel className="pl-2">Zip Code</FormLabel>
-							<FormControl>
-								<Input placeholder="zip" type="text" {...field} />
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-					<Button type="submit" className="rounded-full">
-						Save
-					</Button>
-					</CardContent>
-				</form>
-			</Card>
-		</Form>
+		<form className="flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
+			{FIELDS.map((field) => (
+				<div key={field.name} className="flex flex-col gap-1.5">
+					<Label htmlFor={`profile-${field.name}`} className="pl-2">
+						{field.label}
+					</Label>
+					<Input
+						id={`profile-${field.name}`}
+						name={field.name}
+						placeholder={field.placeholder}
+						type="text"
+						maxLength={MAX_FIELD_LENGTH}
+						value={values[field.name]}
+						onChange={(event) =>
+							setValues((current) => ({
+								...current,
+								[field.name]: event.target.value,
+							}))
+						}
+					/>
+				</div>
+			))}
+			<p className="pl-2 text-xs text-muted-foreground">
+				Your address is optional. Fill in all of it (line 2 aside) or leave it
+				blank.
+			</p>
+			{errors.length > 0 && (
+				<div className="text-sm font-medium text-destructive" role="alert">
+					{errors.map((error) => (
+						<p key={error}>{error}</p>
+					))}
+				</div>
+			)}
+			<Button
+				type="submit"
+				className="rounded-full"
+				disabled={!hydrated || saving}
+			>
+				{saving ? 'Saving...' : 'Save'}
+			</Button>
+		</form>
 	);
 }

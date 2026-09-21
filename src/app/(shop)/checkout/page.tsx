@@ -4,6 +4,7 @@ import AddAddressForm from '@/components/forms/add-address-form';
 import { redirect } from 'next/navigation';
 import Stripe from 'stripe';
 import { getCartById, getCartIdByUserId } from '@/db/cart-db';
+import { getAddressByProfileId, getProfileIdByUserId } from '@/db/user-db';
 import {
 	Table,
 	TableBody,
@@ -142,12 +143,26 @@ export default async function CheckoutPage() {
 	// checkouts that were started and never paid don't pile up
 	await sweepOldCheckoutSnapshots();
 
+	// the address saved on the account starts the form off (when there is one)
+	const profileId = await getProfileIdByUserId(authenticatedUser);
+	const saved = profileId ? await getAddressByProfileId(profileId) : null;
+	const savedAddress = saved?.address1
+		? {
+				address1: saved.address1,
+				address2: saved.address2 ?? '',
+				city: saved.city ?? '',
+				state: saved.state ?? '',
+				zip: saved.zip ?? '',
+			}
+		: null;
+
 	return (
 		<main className="mx-auto max-w-5xl px-5 py-10 sm:px-10">
 			<h1 className="mb-6 font-display text-3xl font-semibold">Checkout</h1>
 			<AddAddressForm
 				clientSecret={paymentIntent.client_secret}
 				orderTotal={orderTotal}
+				savedAddress={savedAddress}
 			>
 				<Card className="shadow-warm-sm">
 					<CardContent className="pt-6">

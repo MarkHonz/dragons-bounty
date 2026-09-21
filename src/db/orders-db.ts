@@ -134,10 +134,32 @@ export const getOrdersByProfileId = async (profileId: string) => {
 			where: {
 				profileId,
 			},
+			// newest first
+			orderBy: { createdAt: 'desc' },
 		});
 	} catch (error) {
 		return error;
 	}
+};
+
+// A customer's latest orders for the Account page, and how many they have in all.
+export const getRecentOrdersByProfileId = async (profileId: string, take: number) => {
+	const [orders, total] = await Promise.all([
+		db.order.findMany({
+			where: { profileId },
+			orderBy: { createdAt: 'desc' },
+			take,
+			select: {
+				id: true,
+				createdAt: true,
+				totalInCents: true,
+				fulfilled: true,
+				refundedAt: true,
+			},
+		}),
+		db.order.count({ where: { profileId } }),
+	]);
+	return { orders, total };
 };
 
 // get order details by order id

@@ -47,5 +47,8 @@ const minutesText = (ms: number) => {
 export const signInBlockedMessage = (ms: number) =>
 	`Too many failed sign-in attempts. Please try again in about ${minutesText(ms)}, or reset your password.`;
 
+export const tooManyRequestsMessage = (ms: number) =>
+	`Too many requests. Please try again in about ${minutesText(ms)}.`;
+
 export const changePasswordBlockedMessage = (ms: number) =>
 	`Too many incorrect attempts. Please try again in about ${minutesText(ms)}.`;

@@ -65,11 +65,12 @@ export const createUser = async ({
 type UpdateUserProfileProps = {
 	id: string;
 	name: string;
-	address1: string;
-	address2: string;
-	city: string;
-	state: string;
-	zip: string;
+	// null clears the saved address
+	address1: string | null;
+	address2: string | null;
+	city: string | null;
+	state: string | null;
+	zip: string | null;
 };
 
 export const updateUserProfile = async ({
@@ -247,6 +248,60 @@ export const getOtherAdmins = async (excludeIds: string[]) => {
 		email: admin.email,
 		name: admin.profile?.name ?? null,
 	}));
+};
+
+// Everything the Account page shows about a customer, and nothing more: it goes
+// to components, so it must never include the password hash.
+export const getAccountOverview = async (userId: string) => {
+	return db.user.findUnique({
+		where: { id: userId },
+		select: {
+			id: true,
+			email: true,
+			emailVerified: true,
+			role: true,
+			createdAt: true,
+			profile: {
+				select: {
+					id: true,
+					name: true,
+					address1: true,
+					address2: true,
+					city: true,
+					state: true,
+					zip: true,
+				},
+			},
+		},
+	});
+};
+
+// How many other devices this account is signed in on (not counting this one).
+export const countOtherSessions = async (userId: string, currentSessionId: string) =>
+	db.session.count({
+		where: {
+			userId,
+			id: { not: currentSessionId },
+			expiresAt: { gt: new Date() },
+		},
+	});
+
+// Signs the account out everywhere except the session it is asked from.
+export const deleteOtherSessions = async (userId: string, currentSessionId: string) => {
+	const result = await db.session.deleteMany({
+		where: { userId, id: { not: currentSessionId } },
+	});
+	return result.count;
+};
+
+// When this account last asked for a verification email, if ever.
+export const lastVerificationRequestAt = async (userId: string) => {
+	const row = await db.verificationToken.findFirst({
+		where: { userId, type: 'EMAIL_VERIFY' },
+		orderBy: { createdAt: 'desc' },
+		select: { createdAt: true },
+	});
+	return row?.createdAt ?? null;
 };
 
 // Replace a user's password with an already-hashed one.

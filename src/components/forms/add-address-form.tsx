@@ -48,6 +48,8 @@ type Inputs = z.infer<typeof formSchema>;
 type CheckoutFormProps = {
 	clientSecret: string;
 	orderTotal: number;
+	// the address saved on the account, to start the form with (still editable)
+	savedAddress?: Inputs | null;
 	children?: React.ReactNode;
 };
 
@@ -93,6 +95,7 @@ const buildStripeAppearance = (): Appearance => {
 export default function AddAddressForm({
 	clientSecret,
 	orderTotal,
+	savedAddress,
 	children,
 }: CheckoutFormProps) {
 	const response: { errors: string[]; success: boolean } = {
@@ -116,7 +119,7 @@ export default function AddAddressForm({
 	}, []);
 	const form = useForm<Inputs>({
 		resolver: zodResolver(formSchema),
-		defaultValues: {
+		defaultValues: savedAddress ?? {
 			address1: '',
 			address2: '',
 			city: '',
@@ -148,6 +151,12 @@ export default function AddAddressForm({
 							<CardTitle className="text-center font-display text-2xl">
 								Shipping Address
 							</CardTitle>
+							{savedAddress && (
+								<p className="text-center text-sm text-muted-foreground">
+									Filled in from your saved address. Change anything below if this
+									order is going somewhere else.
+								</p>
+							)}
 						</CardHeader>
 					<form
 						className="flex flex-col gap-2"

@@ -10,7 +10,15 @@ import {
 	waitForGroup,
 } from '@/lib/attempt-limits';
 
-export type AttemptKind = 'SIGN_IN' | 'CHANGE_PASSWORD';
+// What is being limited. SIGN_IN and CHANGE_PASSWORD are wrong-password guesses;
+// the others cap how often an account (or a target address) can make the site
+// send emails.
+export type AttemptKind =
+	| 'SIGN_IN'
+	| 'CHANGE_PASSWORD'
+	| 'EMAIL_CHANGE'
+	| 'EMAIL_CHANGE_TARGET'
+	| 'VERIFY_RESEND';
 
 export type AttemptDecision =
 	| { allowed: true }

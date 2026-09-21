@@ -17,6 +17,7 @@ import {
 	updateUserProfile,
 } from '@/db/user-db';
 import { hashUserPassword, verifyPassword } from '@/lib/hash';
+import { checkProfile, cleanProfile, isAddressBlank } from '@/lib/profile-rules';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/password-rules';
 import {
 	assertAdminOrThrow,
@@ -669,47 +670,33 @@ export const userUpdateProfile = async (
 	previousState: object,
 	formData: FormData
 ) => {
-	const name = formData.get('name') as string | null;
-	const address1 = formData.get('address1') as string | null;
-	const address2 = formData.get('address2') as string | null;
-	const city = formData.get('city') as string | null;
-	const state = formData.get('state') as string | null;
-	const zip = formData.get('zip') as string | null;
 	const response: { errors: string[]; success: boolean } = {
 		errors: [],
 		success: false,
 	};
 
-	const schema = z.object({
-		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-		address1: z.string().min(2, { message: 'Address is required' }),
-		address2: z.string().optional(),
-		city: z.string().min(2, { message: 'City is required' }),
-		state: z.string().min(2, { message: 'State is required' }),
-		zip: z.string().min(5, { message: 'Zip is required' }),
+	// The name is required; the address is optional but all or nothing (leaving it
+	// blank clears any saved address). See profile-rules.
+	const details = cleanProfile({
+		name: formData.get('name'),
+		address1: formData.get('address1'),
+		address2: formData.get('address2'),
+		city: formData.get('city'),
+		state: formData.get('state'),
+		zip: formData.get('zip'),
 	});
-
-	try {
-		schema.parse({ name, address1, address2, city, state, zip });
-	} catch (error) {
-		const { errors } = error as z.ZodError;
-		errors.map((error) => {
-			response.errors.push(error.message);
-		});
+	const problems = checkProfile(details);
+	if (problems.length > 0) {
+		response.errors.push(...problems);
 		return response;
 	}
-
-	if (
-		typeof name !== 'string' ||
-		typeof address1 !== 'string' ||
-		typeof address2 !== 'string' ||
-		typeof city !== 'string' ||
-		typeof state !== 'string' ||
-		typeof zip !== 'string'
-	) {
-		response.errors.push('Invalid form data');
-		return response;
-	}
+	const blank = isAddressBlank(details);
+	const { name } = details;
+	const address1 = blank ? null : details.address1;
+	const address2 = blank ? null : details.address2 || null;
+	const city = blank ? null : details.city;
+	const state = blank ? null : details.state;
+	const zip = blank ? null : details.zip;
 
 	const { user } = await verifyAuthSession();
 	if (user == null) {
@@ -726,27 +713,4 @@ export const userUpdateProfile = async (
 		response.errors.push('Error updating profile');
 		return response;
 	}
-};
-
-export const resendVerificationEmailAction = async () => {
-	const { user: sessionUser } = await verifyAuthSession();
-	if (sessionUser == null) {
-		return;
-	}
-
-	const user = await getUserById(sessionUser.id);
-	if (user == null || user.emailVerified) {
-		return;
-	}
-
-	const token = await createVerificationToken(
-		user.id,
-		'EMAIL_VERIFY',
-		new Date(Date.now() + ONE_DAY_MS)
-	);
-	await sendVerificationEmail({
-		name: user.profile?.name ?? 'there',
-		email: user.email,
-		verifyUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/verify-email?token=${token}`,
-	});
 };
