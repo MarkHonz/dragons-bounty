@@ -1,20 +1,10 @@
 import { Card } from '@/components/ui/card';
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from '@/components/ui/table';
 import { getOrdersByProfileId, OrderProps } from '@/db/orders-db';
 import { getProfileIdByUserId } from '@/db/user-db';
 import { verifyAuthSession } from '@/lib/auth';
-import { formatCurrency } from '@/lib/formatters';
+import { DataTable } from '@/components/data-table';
 import Link from 'next/link';
-
-const orderStatus = (order: OrderProps) =>
-	order.refundedAt ? 'Refunded' : order.fulfilled ? 'Shipped' : 'Processing';
+import { columns, CustomerOrderRow } from './_components/columns';
 
 export default async function OrdersPage() {
 	// get the authenticated user
@@ -43,59 +33,36 @@ export default async function OrdersPage() {
 		);
 	}
 
+	// only what the table shows is handed to the browser
+	const rows: CustomerOrderRow[] = orders.map((order) => ({
+		id: order.id,
+		createdAt: order.createdAt,
+		totalInCents: order.totalInCents,
+		fulfilled: Boolean(order.fulfilled),
+		refundedAt: order.refundedAt ?? null,
+	}));
+
 	return (
 		<main className="mx-auto flex max-w-3xl flex-col items-center px-5 py-10 sm:px-10">
 			<h1 className="mb-6 font-display text-3xl font-semibold">Orders</h1>
-			<Card className="w-full p-4 shadow-warm-sm sm:p-6">
-				<div className="flex flex-col divide-y divide-border sm:hidden">
-					{orders.map((order: OrderProps) => (
-						<div key={order.id} className="flex flex-col gap-1 py-4">
-							<div className="flex items-center justify-between gap-3">
-								<span className="font-semibold">
-									{order.createdAt.toLocaleDateString()}
-								</span>
-								<span className="text-sm text-muted-foreground">
-									{orderStatus(order)}
-								</span>
-							</div>
-							<Link
-								href={`/orders/${order.id}`}
-								className="text-sm text-primary underline"
-							>
-								#{order.id.slice(-8)}
-							</Link>
-							<span className="font-semibold">
-								{formatCurrency(order.totalInCents / 100)}
-							</span>
-						</div>
-					))}
-				</div>
-				<Table className="hidden sm:table">
-					<TableHeader>
-						<TableRow>
-							<TableHead>Order Date</TableHead>
-							<TableHead>Order Number</TableHead>
-							<TableHead>Order Total</TableHead>
-							<TableHead>Order Status</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{orders.map((order: OrderProps) => {
-														return (
-								<TableRow key={order.id}>
-									<TableCell>{order.createdAt.toLocaleDateString()}</TableCell>
-									<TableCell>
-										<Link href={`/orders/${order.id}`}>#{order.id.slice(-8)}</Link>
-									</TableCell>
-									<TableCell>
-										{formatCurrency(order.totalInCents / 100)}
-									</TableCell>
-									<TableCell>{orderStatus(order)}</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
+			<Card className="w-full p-3 shadow-warm-sm sm:p-4">
+				{rows.length === 0 ? (
+					<p className="p-4 text-center text-muted-foreground">
+						You haven&apos;t placed any orders yet.{' '}
+						<Link href="/" className="font-semibold text-primary underline">
+							Start shopping
+						</Link>
+					</p>
+				) : (
+					<DataTable
+						columns={columns}
+						data={rows}
+						searchColumns={['id', 'status']}
+						searchPlaceholder="Search by order # or status"
+						// newest orders first
+						initialSorting={[{ id: 'createdAt', desc: true }]}
+					/>
+				)}
 			</Card>
 		</main>
 	);

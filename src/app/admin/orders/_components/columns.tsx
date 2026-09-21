@@ -35,7 +35,9 @@ export const columns: ColumnDef<OrderProps>[] = [
 		// search box looks at this value too, so "#" and the number both find it
 		accessorFn: (order) => `#${order.id.slice(-8)}`,
 		header: ({ column }) => <SortableHeader column={column} label="Order #" />,
-		sortingFn: 'alphanumeric',
+		// plain text order: "alphanumeric" reads digit runs as numbers, so #9a… would
+		// come before #66a… and look out of order
+		sortingFn: 'text',
 		cell: ({ row }) => {
 			const { id } = row.original;
 			return (
