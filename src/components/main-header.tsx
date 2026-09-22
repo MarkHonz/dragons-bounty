@@ -57,7 +57,10 @@ export default async function MainHeader() {
 						</Link>
 
 						<div className="ml-auto flex flex-shrink-0 items-center gap-3">
-							<div className="hidden sm:block">
+							{/* below md the hamburger menu is still showing and already has a
+							    Search link, so the inline icon would just be a redundant
+							    control competing for the same cramped row */}
+							<div className="hidden md:block">
 								<HeaderSearch />
 							</div>
 
