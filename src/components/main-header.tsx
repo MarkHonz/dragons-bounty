@@ -1,7 +1,7 @@
 import { userLogout } from '@/actions/user-actions';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, User } from 'lucide-react';
 
 import { verifyAuthSession } from '@/lib/auth';
 import { CartProps, getCartById, getCartIdByUserId } from '@/db/cart-db';
@@ -51,7 +51,7 @@ export default async function MainHeader() {
 					<div className="flex items-center gap-4">
 						<Link
 							href="/"
-							className="hidden whitespace-nowrap font-display text-xl font-semibold sm:inline-block md:text-3xl lg:text-[2.5rem]"
+							className="hidden whitespace-nowrap font-display text-xl font-semibold sm:inline-block md:text-2xl lg:text-[2.5rem]"
 						>
 							Dragon&apos;s Bounty
 						</Link>
@@ -71,11 +71,31 @@ export default async function MainHeader() {
 									Sign In
 								</Link>
 							) : (
-								<form action={userLogout} className="hidden sm:inline-block">
-									<button className="whitespace-nowrap rounded-full border border-border bg-card px-4 py-2 text-sm font-bold">
-										Logout
-									</button>
-								</form>
+								<>
+									<form action={userLogout} className="hidden sm:inline-block">
+										<button className="whitespace-nowrap rounded-full border border-border bg-card px-4 py-2 text-sm font-bold">
+											Logout
+										</button>
+									</form>
+									{/* phones reach the Account page from the menu; tablets, where the
+									    header is tight, get an icon instead of the word */}
+									<Link
+										href="/account"
+										className="hidden whitespace-nowrap rounded-full border border-border bg-card px-4 py-2 text-sm font-bold lg:inline-block"
+									>
+										Account
+									</Link>
+									<Button
+										asChild
+										variant="outline"
+										size="icon"
+										className="hidden rounded-full md:inline-flex lg:hidden"
+									>
+										<Link href="/account" aria-label="Account" title="Account">
+											<User className="h-4 w-4" />
+										</Link>
+									</Button>
+								</>
 							)}
 
 							<Link href="/cart" className="relative">
