@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { getProductStockStatus } from '@/lib/stock';
 import { hasVariants } from '@/lib/variants';
 import ProductActions from './product-actions';
+import ProductOptionsDialog from './product-options-dialog';
 import SortableHeader from '@/components/sortable-header';
 
 export const columns: ColumnDef<ProductProps>[] = [
@@ -80,11 +81,7 @@ export const columns: ColumnDef<ProductProps>[] = [
 			return (
 				<div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center sm:gap-2">
 					{quantity}
-					{optionCount > 0 && (
-						<span className="whitespace-nowrap text-xs text-muted-foreground">
-							{optionCount} {optionCount === 1 ? 'option' : 'options'}
-						</span>
-					)}
+					{optionCount > 0 && <ProductOptionsDialog product={row.original} />}
 					{status === 'low' && (
 						<Badge variant="secondary" className="whitespace-nowrap px-2 sm:px-2.5">
 							Low
