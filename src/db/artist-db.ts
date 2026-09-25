@@ -1,4 +1,5 @@
 import db from '@/db/db';
+import { startOfShopMonth } from '@/lib/shop-time';
 
 export const MIN_ARTIST_NAME_LENGTH = 2;
 export const MAX_ARTIST_NAME_LENGTH = 60;
@@ -239,7 +240,7 @@ export const getArtistPageData = async (artistId: string) => {
 
 export type SalesSummary = ReturnType<typeof summarizeSales>;
 
-// Item counts and item totals (price x quantity), for this calendar month and
+// Item counts and item totals (price x quantity), for this shop month and
 // all time, plus a per-product breakdown (best-selling first). Pure, so it can
 // be unit tested. `now` decides which month "this month" is.
 export const summarizeSales = (
@@ -252,7 +253,8 @@ export const summarizeSales = (
 	}[],
 	now: Date
 ) => {
-	const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+	// the shop's month (its own time zone), same as the admin dashboard
+	const monthStart = startOfShopMonth(now);
 	const month = { items: 0, totalInCents: 0 };
 	const allTime = { items: 0, totalInCents: 0 };
 	const byProduct = new Map<

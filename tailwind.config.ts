@@ -49,7 +49,7 @@ const config: Config = {
 				input: 'var(--input)',
 				ring: 'var(--ring)',
 				chart: {
-					'1': 'hsl(var(--chart-1))',
+					'1': 'var(--chart-1)', // a full oklch() colour (the dashboard's sales bars)
 					'2': 'hsl(var(--chart-2))',
 					'3': 'hsl(var(--chart-3))',
 					'4': 'hsl(var(--chart-4))',

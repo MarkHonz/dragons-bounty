@@ -29,7 +29,8 @@
 		--border: oklch(85% 0.02 235);
 		--input: oklch(85% 0.02 235);
 		--ring: oklch(55% 0.18 250);
-		--chart-1: 12 76% 61%;
+		/* the dashboard's sales bars: the brand blue, checked for contrast on the card */
+		--chart-1: oklch(55% 0.18 250);
 		--chart-2: 173 58% 39%;
 		--chart-3: 197 37% 24%;
 		--chart-4: 43 74% 66%;
@@ -58,7 +59,8 @@
 		--border: oklch(32% 0.04 250);
 		--input: oklch(32% 0.04 250);
 		--ring: oklch(70% 0.15 240);
-		--chart-1: 220 70% 50%;
+		/* a step darker than dark-mode primary, to stay in the readable band on the dark card */
+		--chart-1: oklch(66% 0.15 240);
 		--chart-2: 160 60% 45%;
 		--chart-3: 30 80% 55%;
 		--chart-4: 280 65% 60%;
