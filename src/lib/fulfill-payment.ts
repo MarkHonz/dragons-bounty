@@ -5,7 +5,10 @@ import { getPurchaseInfo } from '@/db/product-db';
 import { getCheckoutSnapshot, SnapshotLine } from '@/db/checkout-snapshot-db';
 import { getAddressByProfileId, getUserById } from '@/db/user-db';
 import { formatVariantLabel } from '@/lib/variants';
-import { sendOrderConfirmationEmail } from '@/lib/notifications';
+import {
+	sendArtistNewOrderEmail,
+	sendOrderConfirmationEmail,
+} from '@/lib/notifications';
 
 // how a cart was stored on the payment before checkout snapshots existed
 type LegacyPurchaseItem = {
@@ -157,6 +160,13 @@ const fulfillOnce = async (
 						profile: { connect: { id: profileId } },
 					},
 				});
+				// who sells each product right now: copied onto the line, so
+				// reassigning a product later never moves this order to someone else
+				const sellers = await tx.product.findMany({
+					where: { id: { in: orderLines.map((line) => line.productId) } },
+					select: { id: true, artistId: true },
+				});
+				const sellerOf = new Map(sellers.map((p) => [p.id, p.artistId ?? '']));
 				for (const line of orderLines) {
 					await tx.order_Product.create({
 						data: {
@@ -164,6 +174,7 @@ const fulfillOnce = async (
 							product_id: line.productId,
 							variant_id: line.variantId,
 							variantName: line.variantName,
+							artistId: sellerOf.get(line.productId) ?? '',
 							quantity: line.quantity,
 							priceInCents: line.unitPriceInCents,
 						},
@@ -249,6 +260,53 @@ const fulfillOnce = async (
 		});
 	} catch (error) {
 		console.error('Failed to send order confirmation email', error);
+	}
+
+	// each artist with items in the order is told what to ship, and where. One
+	// failing never stops the others, and never affects the order.
+	try {
+		const artistLines = await db.order_Product.findMany({
+			where: { order_id: order.id, artistId: { not: '' } },
+			select: {
+				artistId: true,
+				variantName: true,
+				quantity: true,
+				Product: { select: { name: true } },
+			},
+		});
+		const artistIds = Array.from(new Set(artistLines.map((line) => line.artistId)));
+		const artists = await db.user.findMany({
+			where: { id: { in: artistIds }, isArtist: true },
+			select: { id: true, email: true, artistName: true },
+		});
+		for (const artist of artists) {
+			try {
+				await sendArtistNewOrderEmail({
+					email: artist.email,
+					artistName: artist.artistName ?? 'there',
+					orderId: order.id,
+					items: artistLines
+						.filter((line) => line.artistId === artist.id)
+						.map((line) => ({
+							name: formatVariantLabel(line.Product.name, line.variantName),
+							quantity: line.quantity,
+						})),
+					shipTo: {
+						name: shipTo.shipToName,
+						address1: shipTo.shipToAddress1,
+						address2: shipTo.shipToAddress2,
+						city: shipTo.shipToCity,
+						state: shipTo.shipToState,
+						zip: shipTo.shipToZip,
+					},
+					artistPageUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/artist/${artist.id}`,
+				});
+			} catch (error) {
+				console.error('Failed to send an artist their new-order email', error);
+			}
+		}
+	} catch (error) {
+		console.error('Failed to notify artists about a new order', error);
 	}
 
 	return { status: 'created', orderId: order.id };

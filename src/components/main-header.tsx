@@ -16,6 +16,10 @@ export default async function MainHeader() {
 	const sessionUserId = await verifyAuthSession();
 	const authenticatedUser =
 		sessionUserId.user !== null ? sessionUserId.user.id : 'guest';
+	// an artist's own page, for the header link (null for everyone else)
+	const artistPageHref = sessionUserId.user?.isArtist
+		? `/artist/${sessionUserId.user.id}`
+		: null;
 
 	let cartId: string | null = 'guest';
 	if (authenticatedUser !== 'guest') {
@@ -123,6 +127,7 @@ export default async function MainHeader() {
 							<MobileNav
 								navItems={navItems}
 								isSignedIn={authenticatedUser !== 'guest'}
+								artistPageHref={artistPageHref}
 							/>
 						</div>
 					</div>
@@ -140,6 +145,14 @@ export default async function MainHeader() {
 								{item.label}
 							</Link>
 						))}
+						{artistPageHref && (
+							<Link
+								href={artistPageHref}
+								className="text-sm font-bold text-primary hover:underline"
+							>
+								Artist page
+							</Link>
+						)}
 					</nav>
 				</div>
 			</div>

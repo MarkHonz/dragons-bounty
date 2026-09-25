@@ -18,9 +18,11 @@ type NavItem = { href: string; label: string };
 type Props = {
 	navItems: NavItem[];
 	isSignedIn: boolean;
+	// set for artists: their own artist page
+	artistPageHref?: string | null;
 };
 
-export default function MobileNav({ navItems, isSignedIn }: Props) {
+export default function MobileNav({ navItems, isSignedIn, artistPageHref }: Props) {
 	return (
 		<Sheet>
 			<SheetTrigger asChild>
@@ -66,6 +68,14 @@ export default function MobileNav({ navItems, isSignedIn }: Props) {
 				>
 					{isSignedIn ? 'Account' : 'Sign In'}
 				</Link>
+				{artistPageHref && (
+					<Link
+						href={artistPageHref}
+						className="rounded-md px-3 py-2 text-base font-semibold text-foreground hover:bg-muted"
+					>
+						Artist page
+					</Link>
+				)}
 			</SheetContent>
 		</Sheet>
 	);

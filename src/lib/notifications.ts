@@ -14,6 +14,8 @@ import { buildSignInBlockedEmail } from '@/lib/emails/sign-in-blocked-email';
 import { buildEmailChangeConfirmEmail } from '@/lib/emails/email-change-confirm-email';
 import { buildEmailChangeRequestedEmail } from '@/lib/emails/email-change-requested-email';
 import { buildEmailChangedEmail } from '@/lib/emails/email-changed-email';
+import { buildArtistNewOrderEmail } from '@/lib/emails/artist-new-order-email';
+import { buildArtistStatusEmail } from '@/lib/emails/artist-status-email';
 
 type SendVerificationEmailProps = {
 	name: string;
@@ -81,21 +83,16 @@ type SendShippingUpdateEmailProps = {
 	orderId: string;
 	trackingNumber: string | null;
 	orderUrl: string;
+	items?: { name: string; quantity: number }[];
+	sellerName?: string | null;
+	moreToCome?: boolean;
 };
 
 export const sendShippingUpdateEmail = async ({
-	name,
 	email,
-	orderId,
-	trackingNumber,
-	orderUrl,
+	...props
 }: SendShippingUpdateEmailProps) => {
-	const { subject, html, text } = buildShippingUpdateEmail({
-		name,
-		orderId,
-		trackingNumber,
-		orderUrl,
-	});
+	const { subject, html, text } = buildShippingUpdateEmail(props);
 	return sendEmail({ to: email, subject, html, text });
 };
 
@@ -264,5 +261,29 @@ export const sendEmailChangedEmail = async ({
 		maskedNewEmail,
 		forgotPasswordUrl,
 	});
+	return sendEmail({ to: email, subject, html, text });
+};
+
+type SendArtistNewOrderEmailProps = Parameters<typeof buildArtistNewOrderEmail>[0] & {
+	email: string;
+};
+
+export const sendArtistNewOrderEmail = async ({
+	email,
+	...props
+}: SendArtistNewOrderEmailProps) => {
+	const { subject, html, text } = buildArtistNewOrderEmail(props);
+	return sendEmail({ to: email, subject, html, text });
+};
+
+type SendArtistStatusEmailProps = Parameters<typeof buildArtistStatusEmail>[0] & {
+	email: string;
+};
+
+export const sendArtistStatusEmail = async ({
+	email,
+	...props
+}: SendArtistStatusEmailProps) => {
+	const { subject, html, text } = buildArtistStatusEmail(props);
 	return sendEmail({ to: email, subject, html, text });
 };

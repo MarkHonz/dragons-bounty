@@ -16,6 +16,7 @@ type Props = {
 	// the signed-in admin is looking at their own account
 	isSelf: boolean;
 	hasOrders: boolean;
+	isArtist: boolean;
 };
 
 // Role and delete controls for one customer. The server enforces every rule;
@@ -27,6 +28,7 @@ export default function AccountControls({
 	emailVerified,
 	isSelf,
 	hasOrders,
+	isArtist,
 }: Props) {
 	const router = useRouter();
 	const [roleOpen, setRoleOpen] = useState(false);
@@ -41,7 +43,9 @@ export default function AccountControls({
 		? "You can't delete your own account."
 		: isAdmin
 			? "Admins can't be deleted. Remove their admin access first."
-			: hasOrders
+			: isArtist
+				? "Artists can't be deleted. Remove their artist status first."
+				: hasOrders
 				? "They have orders, so they can't be deleted. Their order history has to stay."
 				: null;
 

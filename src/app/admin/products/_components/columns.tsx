@@ -47,6 +47,11 @@ export const columns: ColumnDef<ProductProps>[] = [
 		cell: ({ row }) => (
 			<div>
 				{row.original.name}
+				{row.original.artist?.artistName && (
+					<p className="text-xs text-muted-foreground">
+						by {row.original.artist.artistName}
+					</p>
+				)}
 				{/* the Category and Available columns are hidden on phones */}
 				<p className="text-xs text-muted-foreground sm:hidden">
 					{row.original.category.name}
@@ -109,6 +114,16 @@ export const columns: ColumnDef<ProductProps>[] = [
 		header: ({ column }) => <SortableHeader column={column} label="Category" />,
 		sortingFn: 'alphanumeric',
 		meta: { className: 'hidden sm:table-cell' },
+	},
+	{
+		// never shown (the name shows it): only here so the search box can find an
+		// artist's products
+		id: 'artist',
+		accessorFn: (product) => product.artist?.artistName ?? '',
+		header: () => null,
+		cell: () => null,
+		enableSorting: false,
+		meta: { className: 'hidden' },
 	},
 	{
 		id: 'actions',

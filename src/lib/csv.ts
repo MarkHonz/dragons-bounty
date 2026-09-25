@@ -49,6 +49,9 @@ export type ExportOrderRow = {
 	taxTotalInCents: number | null;
 	totalInCents: number;
 	refundedAmountInCents: number | null;
+	// who ships it, e.g. "Dragon's Bounty; Moonstone Ceramics"
+	sellers: string;
+	// one package: its number; several: "Moonstone Ceramics: 9400...; ..."
 	trackingNumber: string | null;
 	stripePaymentIntentId: string | null;
 };
@@ -73,6 +76,7 @@ export const ORDER_CSV_HEADERS = [
 	'Tax',
 	'Total',
 	'Refunded',
+	'Sellers',
 	'Tracking number',
 	'Stripe payment ID',
 ];
@@ -100,6 +104,7 @@ export const ordersToCsv = (orders: ExportOrderRow[]): string =>
 			dollars(order.taxTotalInCents),
 			dollars(order.totalInCents),
 			dollars(order.refundedAmountInCents),
+			order.sellers,
 			order.trackingNumber,
 			order.stripePaymentIntentId,
 		])

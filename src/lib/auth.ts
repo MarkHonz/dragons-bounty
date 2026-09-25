@@ -15,10 +15,15 @@ export const lucia = new Lucia(adapter, {
 			secure: process.env.NODE_ENV === 'production',
 		},
 	},
-	getUserAttributes: (attributes: { role?: string; id?: string }) => {
+	getUserAttributes: (attributes: {
+		role?: string;
+		id?: string;
+		isArtist?: boolean;
+	}) => {
 		return {
 			role: attributes.role,
 			id: attributes.id,
+			isArtist: attributes.isArtist ?? false,
 			// ...attributes,
 		};
 	},
@@ -109,6 +114,17 @@ export const assertAdminOrThrow = async () => {
 	}
 
 	return result;
+};
+
+// For an artist's own pages: the signed-in person must be that artist or any
+// admin. Returns null otherwise (the caller shows "not found", so the page
+// can't be used to learn who is an artist). `null` user = not signed in.
+export const getArtistPageAccess = async (artistId: string) => {
+	const { user } = await verifyAuthSession();
+	if (user == null) return { user: null, allowed: false as const };
+	const isAdmin = user.role === 'ADMIN';
+	const isThatArtist = user.isArtist && user.id === artistId;
+	return { user, allowed: isAdmin || isThatArtist, isAdmin };
 };
 
 // resolve the current visitor's cart id: 'guest' when signed out, the DB cart id otherwise

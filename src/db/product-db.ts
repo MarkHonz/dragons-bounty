@@ -8,6 +8,8 @@ export type ProductImageProps = {
 };
 
 const orderedImages = { orderBy: { position: 'asc' as const } };
+// the only thing about an artist that product listings show: their public name
+const artistNameOnly = { select: { artistName: true } };
 const orderedVariants = {
 	orderBy: [{ position: 'asc' as const }, { createdAt: 'asc' as const }],
 };
@@ -36,6 +38,9 @@ export type ProductProps = {
 	images: ProductImageProps[];
 	// optional named options; empty for most products
 	variants: VariantProps[];
+	// the artist who makes and ships it (null = the shop's own product)
+	artistId?: string | null;
+	artist?: { artistName: string | null } | null;
 	categoryId: string;
 	isAvailable: boolean;
 	isFeatured: boolean;
@@ -77,6 +82,8 @@ export type CreateProductProps = {
 	quantity?: number;
 	// leave empty (the usual case) for a product sold as a single item
 	variants?: VariantInput[];
+	// the artist who makes and ships it; null (the default) = the shop's own
+	artistId?: string | null;
 };
 
 export type UpdateProductFields = {
@@ -85,6 +92,7 @@ export type UpdateProductFields = {
 	description: string;
 	categoryId: string;
 	quantity?: number;
+	artistId: string | null;
 };
 
 // the first image is the cover
@@ -99,6 +107,7 @@ export const createProduct = async ({
 	categoryId,
 	quantity,
 	variants = [],
+	artistId = null,
 }: CreateProductProps) => {
 	try {
 		return await db.product.create({
@@ -107,6 +116,7 @@ export const createProduct = async ({
 				priceInCents,
 				description,
 				categoryId,
+				artistId,
 				// a product with options is stocked per option, not as a whole
 				quantity: variants.length > 0 ? null : quantity,
 				images: {
@@ -133,6 +143,7 @@ export const getProducts = async () => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 				_count: { select: { Orders_Products: true } },
 			},
@@ -151,6 +162,7 @@ export const getProductById = async (id: string) => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 			},
 		});
@@ -294,6 +306,7 @@ export const getProductsByCategoryId = async (categoryId: string) => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 			},
 			// fetch newest six products
@@ -318,6 +331,7 @@ export const getProductDetails = async (productIdArray: string[]) => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 			},
 		});
@@ -333,6 +347,7 @@ export const getAvailableProducts = async () => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 			},
 			orderBy: storefrontOrder,
@@ -351,6 +366,7 @@ export const getFeaturedProducts = async (limit = 8) => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 			},
 			orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
@@ -371,6 +387,7 @@ export const getAvailableProductsByCategoryId = async (categoryId: string) =>
 		include: {
 			category: true,
 			images: orderedImages,
+			artist: artistNameOnly,
 			variants: orderedVariants,
 		},
 		orderBy: storefrontOrder,
@@ -387,6 +404,7 @@ export const searchAvailableProducts = async (query: string) => {
 			include: {
 				category: true,
 				images: orderedImages,
+				artist: artistNameOnly,
 				variants: orderedVariants,
 			},
 			orderBy: storefrontOrder,

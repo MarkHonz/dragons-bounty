@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import SortableHeader from '@/components/sortable-header';
 import { formatCurrency } from '@/lib/formatters';
+import { orderShippingLabel } from '@/lib/shipping-status';
 
 // The few things the orders list shows. It is handed to a client component, so
 // nothing else about the order (address, payment id...) is sent.
@@ -14,10 +15,15 @@ export type CustomerOrderRow = {
 	totalInCents: number;
 	fulfilled: boolean;
 	refundedAt: Date | null;
+	shippedPackages: number;
+	totalPackages: number;
 };
 
 const statusLabel = (order: CustomerOrderRow) =>
-	order.refundedAt ? 'Refunded' : order.fulfilled ? 'Shipped' : 'Processing';
+	orderShippingLabel(order, {
+		shipped: order.shippedPackages,
+		total: order.totalPackages,
+	});
 
 // sorting puts orders still on their way first, then shipped, then refunded
 const statusRank = (order: CustomerOrderRow) =>

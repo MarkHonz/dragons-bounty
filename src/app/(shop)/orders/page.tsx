@@ -40,6 +40,8 @@ export default async function OrdersPage() {
 		totalInCents: order.totalInCents,
 		fulfilled: Boolean(order.fulfilled),
 		refundedAt: order.refundedAt ?? null,
+		shippedPackages: order.shippedPackages ?? 0,
+		totalPackages: order.totalPackages ?? 0,
 	}));
 
 	return (

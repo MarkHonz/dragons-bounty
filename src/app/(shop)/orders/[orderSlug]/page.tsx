@@ -22,6 +22,8 @@ import { formatCurrency } from '@/lib/formatters';
 import { formatVariantLabel } from '@/lib/variants';
 import { signInUrl } from '@/lib/redirects';
 import OrderTotals, { discountRows } from '@/components/order-totals';
+import { getOrderPackages } from '@/db/shipment-db';
+import { orderShippingLabel } from '@/lib/shipping-status';
 
 type OrderDetailsParams = {
 	params: {
@@ -52,6 +54,8 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 	const orderProducts = (await getOrderProductsByOrderId(
 		order.id
 	)) as OrderProductProps[];
+	// one package per seller: the shop, and each artist with items in the order
+	const packages = await getOrderPackages(order.id);
 
 	return (
 		<main className="mx-auto flex max-w-lg flex-col items-center px-5 py-10 sm:px-10">
@@ -133,11 +137,10 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 				<div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 text-sm text-muted-foreground">
 					<p>
 						Status:{' '}
-						{order.refundedAt
-							? 'Refunded'
-							: order.fulfilled
-								? 'Shipped'
-								: 'Processing'}
+						{orderShippingLabel(order, {
+							shipped: packages.filter((pkg) => pkg.shipment).length,
+							total: packages.length,
+						})}
 					</p>
 					{order.refundedAt && (
 						<p>
@@ -145,10 +148,40 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 							on {order.refundedAt.toLocaleDateString()}
 						</p>
 					)}
-					<p>
-						Tracking number:{' '}
-						{order.trackingNumber ? order.trackingNumber : 'not available'}
-					</p>
+					{packages.length > 1 && (
+						<p>
+							Your order comes in {packages.length} packages, each sent separately
+							by the person who made the items.
+						</p>
+					)}
+					<ul className="flex flex-col gap-2">
+						{packages.map((pkg) => {
+							const from = pkg.sellerId
+								? (pkg.sellerName ?? 'an artist')
+								: "Dragon's Bounty";
+							const items = pkg.lines
+								.map((line) => formatVariantLabel(line.productName, line.variantName))
+								.join(', ');
+							return (
+								<li key={pkg.sellerId || 'shop'} className="break-words">
+									{packages.length > 1 && (
+										<span className="block text-foreground">
+											From {from}: {items}
+										</span>
+									)}
+									{pkg.shipment
+										? `Shipped${
+												pkg.shipment.trackingNumber
+													? ` — tracking number ${pkg.shipment.trackingNumber}`
+													: ''
+											}`
+										: order.refundedAt
+											? 'Not shipped'
+											: 'Not shipped yet — tracking number not available'}
+								</li>
+							);
+						})}
+					</ul>
 				</div>
 			</Card>
 		</main>

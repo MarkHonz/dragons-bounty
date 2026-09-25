@@ -54,6 +54,11 @@ export default function ProductCard({ product, cartId }: ProductCardProps) {
 				</div>
 				<CardHeader className="pb-1.5">
 					<CardTitle className="text-lg">{product.name}</CardTitle>
+					{product.artist?.artistName && (
+						<p className="text-xs font-semibold text-muted-foreground">
+							Made by {product.artist.artistName}
+						</p>
+					)}
 				</CardHeader>
 				<CardContent className="line-clamp-2 flex-1 text-sm text-muted-foreground">
 					{product.description}

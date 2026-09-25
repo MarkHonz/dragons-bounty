@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import SortableHeader from '@/components/sortable-header';
 import Link from 'next/link';
 import { StickyNote } from 'lucide-react';
+import { orderShippingLabel } from '@/lib/shipping-status';
 
 export const columns: ColumnDef<OrderProps>[] = [
 	{
@@ -23,8 +24,14 @@ export const columns: ColumnDef<OrderProps>[] = [
 					variant={
 						rank === 2 ? 'destructive' : rank === 1 ? 'secondary' : 'outline'
 					}
+					className="whitespace-nowrap"
 				>
-					{rank === 2 ? 'Refunded' : rank === 1 ? 'Fulfilled' : 'Processing'}
+					{rank === 1
+						? 'Fulfilled'
+						: orderShippingLabel(row.original, {
+								shipped: row.original.shippedPackages ?? 0,
+								total: row.original.totalPackages ?? 0,
+							})}
 				</Badge>
 			);
 		},

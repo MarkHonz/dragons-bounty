@@ -530,6 +530,12 @@ export const userDeleteAction = async (userId: string) => {
 		);
 		return response;
 	}
+	if (target.isArtist) {
+		response.errors.push(
+			"Artists can't be deleted. Remove their artist status first."
+		);
+		return response;
+	}
 
 	try {
 		await deleteUser(userId);

@@ -25,6 +25,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { productSubmit } from '@/actions/product-actions';
 import { CategoryProps } from '@/db/category-db';
+import ArtistSelect, { ArtistOption } from '@/components/forms/artist-select';
 import ProductImagesField, {
 	ProductImagesValue,
 } from '@/components/forms/product-images-field';
@@ -57,9 +58,10 @@ type Inputs = z.infer<typeof formSchema>;
 // infer the type of the categories
 type AddProductFormProps = {
 	categories: CategoryProps[];
+	artists: ArtistOption[];
 };
 // create a form component
-export default function AddProductForm({ categories }: AddProductFormProps) {
+export default function AddProductForm({ categories, artists }: AddProductFormProps) {
 	// create a router instance
 	const router = useRouter();
 	// create a form instance
@@ -82,6 +84,8 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 	// optional options (sizes, colours...); none for most products
 	const [options, setOptions] = useState<OptionRow[]>([]);
 	const [optionError, setOptionError] = useState('');
+	// "" = the shop's own product
+	const [artistId, setArtistId] = useState('');
 	// create a submit handler
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
 		setFormError('');
@@ -109,6 +113,7 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 			formData.append('quantity', data.quantity);
 			formData.append('variants', optionRowsPayload(options));
 			formData.append('categoryId', data.categoryId);
+			formData.append('artistId', artistId);
 			images.added.forEach((file) => formData.append('images', file));
 			const result = await productSubmit({}, formData);
 			if (result.success) {
@@ -234,6 +239,7 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
 							);
 						}}
 					/>
+					<ArtistSelect artists={artists} value={artistId} onChange={setArtistId} />
 					<div className="pb-2">
 						<ProductOptionsField
 							value={options}

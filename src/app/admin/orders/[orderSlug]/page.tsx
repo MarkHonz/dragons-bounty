@@ -1,9 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
 	Table,
 	TableBody,
@@ -22,13 +18,15 @@ import { getProductNameById } from '@/db/product-db';
 import { getAddressByProfileId } from '@/db/user-db';
 import { formatCurrency } from '@/lib/formatters';
 import { formatVariantLabel } from '@/lib/variants';
-import { updateOrderFulfillmentAction } from '@/actions/order-actions';
 import OrderTotals, { discountRows } from '@/components/order-totals';
 import RefundOrderForm from '../_components/refund-order-form';
 import OrderNotes from '../_components/order-notes';
 import OrderHistory from '../_components/order-history';
 import { getOrderNotes } from '@/db/order-notes-db';
 import { getOrderActivity } from '@/db/activity-db';
+import { getOrderPackages } from '@/db/shipment-db';
+import { orderShippingLabel } from '@/lib/shipping-status';
+import OrderPackages from '../_components/order-packages';
 
 type ShippingAddress = {
 	name: string | null;
@@ -85,20 +83,21 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 
 	// the History card is a convenience: if the log can't be read, the rest of
 	// the order page still works
-	const [notes, history] = await Promise.all([
+	const [notes, history, packages] = await Promise.all([
 		getOrderNotes(order.id),
 		getOrderActivity(order.id).catch((error) => {
 			console.error('Failed to read the order history', error);
 			return [];
 		}),
+		getOrderPackages(order.id),
 	]);
 
 	const isRefunded = Boolean(order.refundedAt);
-	const status = isRefunded
-		? 'Refunded'
-		: order.fulfilled
-			? 'Fulfilled'
-			: 'Processing';
+	const shippedCount = packages.filter((pkg) => pkg.shipment).length;
+	const status = orderShippingLabel(order, {
+		shipped: shippedCount,
+		total: packages.length,
+	});
 	const refundedAmount = formatCurrency((order.refundedAmountInCents ?? 0) / 100);
 
 	return (
@@ -193,37 +192,13 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 						/>
 					</div>
 					{!isRefunded && (
-						<form
-							action={updateOrderFulfillmentAction}
-							className="mt-4 flex w-full flex-col items-start gap-3 border-t border-border pt-4"
-						>
-							<input type="hidden" name="orderId" value={order.id} />
-							<label className="flex items-center gap-2 text-sm font-semibold">
-								<Checkbox name="fulfilled" defaultChecked={order.fulfilled} />
-								Fulfilled
-							</label>
-							<div className="flex w-full flex-col gap-1.5">
-								<Label htmlFor="trackingNumber">Tracking number</Label>
-								<Input
-									id="trackingNumber"
-									type="text"
-									name="trackingNumber"
-									defaultValue={order.trackingNumber ?? ''}
-								/>
-							</div>
-							<Button type="submit" className="rounded-full">
-								Save
-							</Button>
-						</form>
-					)}
-					{!isRefunded && (
 						<div className="mt-4 flex w-full flex-col gap-3 border-t border-border pt-4">
 							<h2 className="font-display text-lg font-semibold">Refund</h2>
 							<RefundOrderForm
 								orderId={order.id}
 								totalInCents={order.totalInCents}
 								hasStripePayment={Boolean(order.stripePaymentIntentId)}
-								shipped={Boolean(order.fulfilled)}
+								shipped={shippedCount > 0}
 							/>
 						</div>
 					)}
@@ -250,6 +225,13 @@ export default async function OrderDetailPage({ params }: OrderDetailsParams) {
 						))}
 					</CardContent>
 				</Card>
+			</div>
+			<div className="mt-6">
+				<OrderPackages
+					orderId={order.id}
+					packages={packages}
+					refunded={isRefunded}
+				/>
 			</div>
 			<div className="mt-6 flex flex-col items-start gap-6 md:flex-row">
 				<OrderNotes orderId={order.id} notes={notes} />

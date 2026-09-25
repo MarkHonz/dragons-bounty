@@ -24,6 +24,8 @@ import {
 import { MAX_PRODUCT_IMAGES, validateImageFile } from '@/lib/product-images';
 import { parsePriceToCents } from '@/lib/formatters';
 import { logActivity } from '@/db/activity-db';
+import { isArtistAccount } from '@/db/artist-db';
+import db from '@/db/db';
 
 const s3Client = new S3Client({
 	region: process.env.NEXT_AWS_S3_REGION!,
@@ -90,6 +92,19 @@ const uploadImages = async (files: File[], name: string) => {
 	}
 };
 
+// The "Artist" choice on the product form: "" is the shop's own product,
+// anything else must be someone who is currently an artist.
+const readArtistChoice = async (
+	formData: FormData
+): Promise<{ artistId: string | null } | { error: string }> => {
+	const raw = formData.get('artistId');
+	if (raw === null || raw === '') return { artistId: null };
+	if (typeof raw !== 'string' || !(await isArtistAccount(raw))) {
+		return { error: 'Choose an artist from the list.' };
+	}
+	return { artistId: raw };
+};
+
 export const productSubmit = async (
 	previousState: object,
 	formData: FormData
@@ -114,6 +129,12 @@ export const productSubmit = async (
 		return response;
 	}
 	const variants = parsedOptions.variants;
+
+	const artistChoice = await readArtistChoice(formData);
+	if ('error' in artistChoice) {
+		response.errors.push(artistChoice.error);
+		return response;
+	}
 
 	// Create a schema for the form data
 	const schema = z.object({
@@ -210,6 +231,7 @@ export const productSubmit = async (
 		imagePaths: imageKeys,
 		quantity,
 		variants,
+		artistId: artistChoice.artistId,
 	});
 	if (created instanceof Error) {
 		await deleteObjects(imageKeys);
@@ -347,6 +369,12 @@ export const productUpdate = async (
 	}
 	const variants = parsedOptions.variants;
 
+	const artistChoice = await readArtistChoice(formData);
+	if ('error' in artistChoice) {
+		response.errors.push(artistChoice.error);
+		return response;
+	}
+
 	// Create a schema for the form data
 	const schema = z.object({
 		name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
@@ -476,7 +504,14 @@ export const productUpdate = async (
 	// Update the product; if that fails, don't leave the new uploads orphaned
 	const updated = await updateProductWithImages(
 		id,
-		{ name, priceInCents, description, categoryId, quantity },
+		{
+			name,
+			priceInCents,
+			description,
+			categoryId,
+			quantity,
+			artistId: artistChoice.artistId,
+		},
 		keepPaths,
 		addedPaths,
 		variants
@@ -491,6 +526,22 @@ export const productUpdate = async (
 	await deleteObjects(currentPaths.filter((path) => !keepPaths.includes(path)));
 
 	await logActivity(admin.id, 'PRODUCT', `Edited the product "${name}"`);
+	const previousArtist = (existing as { artistId?: string | null }).artistId ?? null;
+	if (previousArtist !== artistChoice.artistId) {
+		const artist = artistChoice.artistId
+			? await db.user.findUnique({
+					where: { id: artistChoice.artistId },
+					select: { artistName: true },
+				})
+			: null;
+		await logActivity(
+			admin.id,
+			'PRODUCT',
+			artist
+				? `Set the artist of "${name}" to ${artist.artistName ?? 'an artist'}`
+				: `Made "${name}" one of the shop's own products (no artist)`
+		);
+	}
 
 	// Revalidate the product page
 	revalidatePath(`/products`, 'layout');

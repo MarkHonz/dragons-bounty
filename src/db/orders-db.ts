@@ -4,6 +4,7 @@ import db from '@/db/db';
 import { formatVariantLabel } from '@/lib/variants';
 import type { ExportOrderRow } from '@/lib/csv';
 import type { OrderDateRange } from '@/lib/date-range';
+import { getShippingProgress } from '@/db/shipment-db';
 
 export type OrderProps = {
 	id: string;
@@ -23,6 +24,9 @@ export type OrderProps = {
 	// set by the admin orders list)
 	noteCount?: number;
 	customerEmail?: string;
+	// packages (one per seller) shipped so far, out of how many (lists only)
+	shippedPackages?: number;
+	totalPackages?: number;
 	refundedAt?: Date | null;
 	refundedAmountInCents?: number | null;
 	stripeRefundId?: string | null;
@@ -130,13 +134,19 @@ export const getOrderByPaymentIntentId = async (
 // get orders by user profile id
 export const getOrdersByProfileId = async (profileId: string) => {
 	try {
-		return await db.order.findMany({
+		const orders = await db.order.findMany({
 			where: {
 				profileId,
 			},
 			// newest first
 			orderBy: { createdAt: 'desc' },
 		});
+		const progress = await getShippingProgress(orders.map((order) => order.id));
+		return orders.map((order) => ({
+			...order,
+			shippedPackages: progress.get(order.id)?.shipped ?? 0,
+			totalPackages: progress.get(order.id)?.total ?? 0,
+		}));
 	} catch (error) {
 		return error;
 	}
@@ -144,7 +154,7 @@ export const getOrdersByProfileId = async (profileId: string) => {
 
 // A customer's latest orders for the Account page, and how many they have in all.
 export const getRecentOrdersByProfileId = async (profileId: string, take: number) => {
-	const [orders, total] = await Promise.all([
+	const [found, total] = await Promise.all([
 		db.order.findMany({
 			where: { profileId },
 			orderBy: { createdAt: 'desc' },
@@ -159,6 +169,12 @@ export const getRecentOrdersByProfileId = async (profileId: string, take: number
 		}),
 		db.order.count({ where: { profileId } }),
 	]);
+	const progress = await getShippingProgress(found.map((order) => order.id));
+	const orders = found.map((order) => ({
+		...order,
+		shippedPackages: progress.get(order.id)?.shipped ?? 0,
+		totalPackages: progress.get(order.id)?.total ?? 0,
+	}));
 	return { orders, total };
 };
 
@@ -205,10 +221,13 @@ export const getOrders = async (status?: OrderStatusFilter) => {
 				profile: { select: { user: { select: { email: true } } } },
 			},
 		});
+		const progress = await getShippingProgress(orders.map((order) => order.id));
 		return orders.map(({ _count, profile, ...order }) => ({
 			...order,
 			noteCount: _count.notes,
 			customerEmail: profile.user.email,
+			shippedPackages: progress.get(order.id)?.shipped ?? 0,
+			totalPackages: progress.get(order.id)?.total ?? 0,
 		}));
 	} catch (error) {
 		return error;
@@ -237,6 +256,7 @@ export const getOrdersForExport = async (
 		orderBy: { createdAt: 'desc' },
 		include: {
 			Order_Products: true,
+			shipments: { select: { sellerId: true, trackingNumber: true } },
 			profile: { select: { name: true, user: { select: { email: true } } } },
 		},
 	});
@@ -248,6 +268,22 @@ export const getOrdersForExport = async (
 		select: { id: true, name: true },
 	});
 	const names = new Map(products.map((product) => [product.id, product.name]));
+	const artistIds = Array.from(
+		new Set(
+			orders.flatMap((order) =>
+				order.Order_Products.map((line) => line.artistId).filter(Boolean)
+			)
+		)
+	);
+	const artists = await db.user.findMany({
+		where: { id: { in: artistIds } },
+		select: { id: true, artistName: true },
+	});
+	const sellerNames = new Map(
+		artists.map((artist) => [artist.id, artist.artistName ?? 'Former artist'])
+	);
+	const sellerName = (sellerId: string) =>
+		sellerId ? (sellerNames.get(sellerId) ?? 'Former artist') : "Dragon's Bounty";
 
 	return orders.map((order) => ({
 		id: order.id,
@@ -279,7 +315,23 @@ export const getOrdersForExport = async (
 		taxTotalInCents: order.taxTotalInCents,
 		totalInCents: order.totalInCents,
 		refundedAmountInCents: order.refundedAmountInCents,
-		trackingNumber: order.trackingNumber,
+		...(() => {
+			const sellers = Array.from(
+				new Set(order.Order_Products.map((line) => line.artistId))
+			);
+			const tracked = order.shipments.filter((s) => s.trackingNumber);
+			return {
+				sellers: sellers.map(sellerName).join('; '),
+				trackingNumber:
+					tracked.length === 0
+						? null
+						: sellers.length <= 1
+							? tracked[0].trackingNumber
+							: tracked
+									.map((s) => `${sellerName(s.sellerId)}: ${s.trackingNumber}`)
+									.join('; '),
+			};
+		})(),
 		stripePaymentIntentId: order.stripePaymentIntentId,
 	}));
 };
@@ -337,21 +389,6 @@ export const getOrderProductsByOrderId = async (order_id: string) => {
 export const getOrderProducts = async () => {
 	try {
 		return await db.order_Product.findMany();
-	} catch (error) {
-		return error;
-	}
-};
-
-// update an order's fulfillment status and/or tracking number
-export const updateOrderFulfillment = async (
-	orderId: string,
-	data: { fulfilled?: boolean; trackingNumber?: string | null }
-) => {
-	try {
-		return await db.order.update({
-			where: { id: orderId },
-			data,
-		});
 	} catch (error) {
 		return error;
 	}

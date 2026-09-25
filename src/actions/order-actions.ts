@@ -7,10 +7,9 @@ import {
 	getOrderDetails,
 	markOrderRefunded,
 	OrderProps,
-	updateOrderFulfillment,
 } from '@/db/orders-db';
 import { getProfileNameById, getUserByProfileId } from '@/db/user-db';
-import { sendRefundEmail, sendShippingUpdateEmail } from '@/lib/notifications';
+import { sendRefundEmail } from '@/lib/notifications';
 import { stripe } from '@/lib/stripe';
 import { logActivity } from '@/db/activity-db';
 import { addOrderNote, deleteOrderNote } from '@/db/order-notes-db';
@@ -19,74 +18,6 @@ import { formatCurrency } from '@/lib/formatters';
 
 // the short id the emails and the phone layout use
 const shortId = (orderId: string) => `#${orderId.slice(-8)}`;
-
-export const updateOrderFulfillmentAction = async (formData: FormData) => {
-	const { user: admin } = await assertAdminOrThrow();
-
-	const orderId = formData.get('orderId')?.toString();
-	if (!orderId) return;
-
-	const fulfilled = formData.get('fulfilled') === 'on';
-	const trackingNumber = formData.get('trackingNumber')?.toString() || null;
-
-	const existingOrder = (await getOrderDetails(orderId)) as OrderProps | null;
-	// a refunded order is closed: don't let it be marked shipped (and emailed)
-	if (existingOrder?.refundedAt) return;
-	const wasFulfilled = existingOrder?.fulfilled ?? false;
-
-	const updated = await updateOrderFulfillment(orderId, {
-		fulfilled,
-		trackingNumber,
-	});
-
-	// record what actually changed; saving with nothing changed writes nothing
-	if (existingOrder && !(updated instanceof Error)) {
-		const label = shortId(orderId);
-		if (fulfilled !== wasFulfilled) {
-			await logActivity(
-				admin.id,
-				'ORDER',
-				`Marked order ${label} as ${fulfilled ? 'shipped' : 'not shipped'}`,
-				orderId
-			);
-		}
-		const oldTracking = existingOrder.trackingNumber || null;
-		if (trackingNumber !== oldTracking) {
-			await logActivity(
-				admin.id,
-				'ORDER',
-				trackingNumber
-					? oldTracking
-						? `Changed the tracking number on order ${label} to ${trackingNumber}`
-						: `Added tracking number ${trackingNumber} to order ${label}`
-					: `Removed the tracking number from order ${label}`,
-				orderId
-			);
-		}
-	}
-
-	// only notify on the false -> true transition, never on repeat saves
-	if (!wasFulfilled && fulfilled && existingOrder) {
-		try {
-			const user = await getUserByProfileId(existingOrder.profileId);
-			if (user) {
-				const name = await getProfileNameById(existingOrder.profileId);
-				await sendShippingUpdateEmail({
-					name: name ?? 'there',
-					email: user.email,
-					orderId,
-					trackingNumber,
-					orderUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/orders/${orderId}`,
-				});
-			}
-		} catch (error) {
-			console.error('Failed to send shipping update email', error);
-		}
-	}
-
-	revalidatePath('/admin/orders');
-	revalidatePath(`/admin/orders/${orderId}`);
-};
 
 // Refund an order in full. Goes through Stripe when the order has a payment on
 // record; otherwise it only marks the order refunded (no money moves).

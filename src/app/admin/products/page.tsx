@@ -109,8 +109,8 @@ export default async function AdminProductsPage({ searchParams }: Props) {
 							key={`${stock ?? 'all'}-${availableOnly}`}
 							columns={columns}
 							data={products}
-							searchColumns={['name', 'category.name']}
-							searchPlaceholder="Search by name or category"
+							searchColumns={['name', 'category.name', 'artist']}
+							searchPlaceholder="Search by name, category or artist"
 						/>
 					</Card>
 				</>

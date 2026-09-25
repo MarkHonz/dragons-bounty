@@ -16,11 +16,20 @@ import EditProfileDialog from './_components/edit-profile-dialog';
 import PendingEmailBanner from './_components/pending-email-banner';
 import ResendVerificationButton from './_components/resend-verification-button';
 import SignOutOthersButton from './_components/sign-out-others-button';
+import { orderShippingLabel } from '@/lib/shipping-status';
 
 const RECENT_ORDERS = 3;
 
-const orderStatus = (order: { fulfilled: boolean; refundedAt: Date | null }) =>
-	order.refundedAt ? 'Refunded' : order.fulfilled ? 'Shipped' : 'Processing';
+const orderStatus = (order: {
+	fulfilled: boolean;
+	refundedAt: Date | null;
+	shippedPackages: number;
+	totalPackages: number;
+}) =>
+	orderShippingLabel(order, {
+		shipped: order.shippedPackages,
+		total: order.totalPackages,
+	});
 
 // a label and its value, one per line
 const Detail = ({

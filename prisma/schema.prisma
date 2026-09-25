@@ -11,20 +11,24 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  password           String
-  email              String              @unique
-  emailVerified      Boolean             @default(false)
-  role               String              @default("USER") // This is a string attribute with a default value
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  profile            Profile? // This is a one-to-one relation
-  sessions           Session[] // This is a one-to-many relation (important!)
-  verificationTokens VerificationToken[] // This is a one-to-many relation
-  roleChangesReceived RoleChange[]       @relation("RoleChangeTarget")
-  roleChangesMade     RoleChange[]       @relation("RoleChangeActor")
+  id                  String              @id @default(cuid())
+  password            String
+  email               String              @unique
+  emailVerified       Boolean             @default(false)
+  role                String              @default("USER") // This is a string attribute with a default value
+  // an artist sells their own products here and ships them; independent of role
+  isArtist            Boolean             @default(false)
+  artistName          String? // the public "Made by" name, set when made an artist
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  profile             Profile? // This is a one-to-one relation
+  sessions            Session[] // This is a one-to-many relation (important!)
+  verificationTokens  VerificationToken[] // This is a one-to-many relation
+  roleChangesReceived RoleChange[]        @relation("RoleChangeTarget")
+  roleChangesMade     RoleChange[]        @relation("RoleChangeActor")
   orderNotes          OrderNote[]
   activity            ActivityLog[]
+  artistProducts      Product[]           @relation("ProductArtist")
 }
 
 // One row each time an admin makes or removes another admin. The emails and
@@ -83,31 +87,52 @@ model Profile {
 }
 
 model Order {
-  id                   String          @id @default(cuid())
-  productTotalInCents  Int
-  shippingTotalInCents Int?
-  taxTotalInCents      Int?
-  totalInCents         Int
-  trackingNumber       String?
-  fulfilled            Boolean         @default(false)
-  stripePaymentIntentId String?        @unique
-  refundedAt           DateTime? // set once the order is fully refunded
+  id                    String          @id @default(cuid())
+  productTotalInCents   Int
+  shippingTotalInCents  Int?
+  taxTotalInCents       Int?
+  totalInCents          Int
+  trackingNumber        String?
+  fulfilled             Boolean         @default(false)
+  stripePaymentIntentId String?         @unique
+  refundedAt            DateTime? // set once the order is fully refunded
   refundedAmountInCents Int?
-  stripeRefundId       String? // null on a refunded order means it was marked refunded manually
-  shipToName           String? // the shipping address as it was at checkout; null on orders placed before this was saved
-  shipToAddress1       String?
-  shipToAddress2       String?
-  shipToCity           String?
-  shipToState          String?
-  shipToZip            String?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  profile              Profile         @relation(fields: [profileId], references: [id], onDelete: Restrict) // This is a many-to-one relation
-  profileId            String
-  discountInCents      Int             @default(0) // taken off the items total by a discount code
-  discountCode         String? // the code used, as text (no relation, so deleting a code never touches order history)
-  Order_Products       Order_Product[] // This is a many-to-many relation
-  notes                OrderNote[]
+  stripeRefundId        String? // null on a refunded order means it was marked refunded manually
+  shipToName            String? // the shipping address as it was at checkout; null on orders placed before this was saved
+  shipToAddress1        String?
+  shipToAddress2        String?
+  shipToCity            String?
+  shipToState           String?
+  shipToZip             String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  profile               Profile         @relation(fields: [profileId], references: [id], onDelete: Restrict) // This is a many-to-one relation
+  profileId             String
+  discountInCents       Int             @default(0) // taken off the items total by a discount code
+  discountCode          String? // the code used, as text (no relation, so deleting a code never touches order history)
+  Order_Products        Order_Product[] // This is a many-to-many relation
+  notes                 OrderNote[]
+  shipments             Shipment[]
+}
+
+// One package of an order, sent by one seller. An order with items from several
+// sellers ships as several packages; Order.fulfilled is true once every seller
+// in the order has one of these. `sellerId` is "" for the shop's own items, or
+// the artist's user id (a copy, not a relation, so order history survives the
+// account). trackingNumber is only null on orders shipped before packages existed.
+model Shipment {
+  id             String   @id @default(cuid())
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId        String
+  sellerId       String   @default("")
+  trackingNumber String?
+  shippedAt      DateTime @default(now())
+  shippedById    String? // the account that marked it shipped (null on migrated orders)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([orderId, sellerId])
+  @@index([sellerId])
 }
 
 model Cart {
@@ -121,21 +146,25 @@ model Cart {
 }
 
 model Product {
-  id              String          @id @default(cuid())
+  id              String           @id @default(cuid())
   name            String
   priceInCents    Int
   description     String
   quantity        Int?
-  isAvailable     Boolean         @default(true)
-  isFeatured      Boolean         @default(false)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict) // This is a one-to-many relation
-  categoryId      String          @map("catagoryId")
+  isAvailable     Boolean          @default(true)
+  isFeatured      Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  category        Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict) // This is a one-to-many relation
+  categoryId      String           @map("catagoryId")
   Orders_Products Order_Product[] // This is a many-to-many relation
   Cart_Products   Cart_Product[] // This is a many-to-many relation
   images          ProductImage[] // Position 0 is the cover image
   variants        ProductVariant[] // optional named options (size, colour...), each with its own stock
+  artist          User?            @relation("ProductArtist", fields: [artistId], references: [id], onDelete: SetNull)
+  artistId        String? // null = the shop's own product
+
+  @@index([artistId])
 }
 
 // One choosable option of a product. A product with no rows here is sold as a
@@ -195,12 +224,14 @@ model Order_Product {
   product_id   String
   variant_id   String  @default("") // "" = the product has no options
   variantName  String  @default("") // the option's name when it was bought
+  artistId     String  @default("") // who sold it, as at checkout: "" = the shop, else the artist's user id
   Order        Order   @relation(fields: [order_id], references: [id], onDelete: Restrict)
   Product      Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
   quantity     Int
   priceInCents Int     @default(0)
 
   @@id([order_id, product_id, variant_id])
+  @@index([artistId])
   @@map("Orders_Product")
 }
 
@@ -229,10 +260,10 @@ model DiscountCode {
 
 // One row at most (id "shop"); with no row the shop uses the defaults in src/lib/pricing.ts
 model ShippingSettings {
-  id               String   @id
-  flatRateInCents  Int
-  freeOverInCents  Int? // null = shipping is never free by total
-  updatedAt        DateTime @updatedAt
+  id              String   @id
+  flatRateInCents Int
+  freeOverInCents Int? // null = shipping is never free by total
+  updatedAt       DateTime @updatedAt
 }
 
 // An admin-only note on an order. The author's email and name are copied in so

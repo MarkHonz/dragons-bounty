@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { getUserById } from '@/db/user-db';
 import { getOrdersByProfileId, OrderProps } from '@/db/orders-db';
+import { orderShippingLabel } from '@/lib/shipping-status';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,6 +16,8 @@ import {
 import { formatCurrency } from '@/lib/formatters';
 import { verifyAuthSession } from '@/lib/auth';
 import AccountControls from './_components/account-controls';
+import ArtistControls from './_components/artist-controls';
+import { countUnshippedForSeller } from '@/db/artist-db';
 
 export default async function AdminCustomerDetailPage({
 	params,
@@ -96,6 +99,17 @@ export default async function AdminCustomerDetailPage({
 						emailVerified={user.emailVerified}
 						isSelf={sessionUser?.id === user.id}
 						hasOrders={hasOrders}
+						isArtist={user.isArtist}
+					/>
+					<ArtistControls
+						userId={user.id}
+						label={user.profile?.name || user.email}
+						isArtist={user.isArtist}
+						artistName={user.artistName}
+						emailVerified={user.emailVerified}
+						unshippedCount={
+							user.isArtist ? await countUnshippedForSeller(user.id) : 0
+						}
 					/>
 				</CardContent>
 			</Card>
@@ -163,11 +177,12 @@ async function UserOrders({ profileId }: { profileId: string }) {
 												: 'outline'
 									}
 								>
-									{order.refundedAt
-										? 'Refunded'
-										: order.fulfilled
-											? 'Fulfilled'
-											: 'Pending'}
+									{order.fulfilled && !order.refundedAt
+										? 'Fulfilled'
+										: orderShippingLabel(order, {
+												shipped: order.shippedPackages ?? 0,
+												total: order.totalPackages ?? 0,
+											})}
 								</Badge>
 							</TableCell>
 						</TableRow>

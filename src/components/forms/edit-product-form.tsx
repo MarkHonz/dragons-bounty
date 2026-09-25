@@ -27,6 +27,7 @@ import {
 import { productUpdate } from '@/actions/product-actions';
 import { ProductProps } from '@/db/product-db';
 import { CategoryProps } from '@/db/category-db';
+import ArtistSelect, { ArtistOption } from '@/components/forms/artist-select';
 import ProductImagesField, {
 	ProductImagesValue,
 } from '@/components/forms/product-images-field';
@@ -59,11 +60,13 @@ type Inputs = z.infer<typeof formSchema>;
 type ProductFormProps = {
 	product: ProductProps;
 	categories: CategoryProps[];
+	artists: ArtistOption[];
 };
 
 export default function EditProductForm({
 	product,
 	categories,
+	artists,
 }: ProductFormProps) {
 	const router = useRouter();
 	const form = useForm<Inputs>({
@@ -91,6 +94,8 @@ export default function EditProductForm({
 		optionRowsFromProduct(product.variants)
 	);
 	const [optionError, setOptionError] = useState('');
+	// "" = the shop's own product
+	const [artistId, setArtistId] = useState(product.artistId ?? '');
 
 	const handleSubmit: SubmitHandler<Inputs> = async (data: Inputs) => {
 		setFormError('');
@@ -118,6 +123,7 @@ export default function EditProductForm({
 			formData.append('price', data.price);
 			formData.append('description', data.description);
 			formData.append('categoryId', data.categoryId);
+			formData.append('artistId', artistId);
 			formData.append('quantity', data.quantity);
 			formData.append('variants', optionRowsPayload(options));
 			formData.append('keepImages', JSON.stringify(images.keep));
@@ -255,6 +261,7 @@ export default function EditProductForm({
 							);
 						}}
 					/>
+					<ArtistSelect artists={artists} value={artistId} onChange={setArtistId} />
 					<ProductOptionsField
 						value={options}
 						onChange={(next) => {

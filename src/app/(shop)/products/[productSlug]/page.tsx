@@ -57,6 +57,11 @@ export default async function ProductDetailPage({ params }: Params) {
 					<h1 className="font-display text-3xl font-semibold md:text-4xl">
 						{product.name}
 					</h1>
+					{product.artist?.artistName && (
+						<p className="-mt-2 text-sm font-semibold text-muted-foreground">
+							Made by {product.artist.artistName}
+						</p>
+					)}
 					<p className="text-base leading-relaxed text-muted-foreground">
 						{product.description}
 					</p>
