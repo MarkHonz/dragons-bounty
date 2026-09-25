@@ -60,18 +60,12 @@ export default async function AdminDashboardPage() {
 				>
 					Needs attention
 				</h2>
-				<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 					<StatTile
 						href="/admin/orders?status=shipping"
 						label="Orders to ship"
 						value={overview.ordersToShip}
 						attention={overview.ordersToShip > 0}
-					/>
-					<StatTile
-						href="/admin/products?stock=low"
-						label="Low stock"
-						value={overview.lowStock}
-						attention={overview.lowStock > 0}
 					/>
 					<StatTile
 						href="/admin/products?stock=out"

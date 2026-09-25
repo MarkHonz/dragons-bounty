@@ -44,9 +44,7 @@ export default async function AdminProductsPage({ searchParams }: Props) {
 		? allProducts.filter((product) => product.isAvailable)
 		: allProducts;
 	const counts = countStock(scoped);
-	const products = stock
-		? scoped.filter((product) => matchesStockFilter(product, stock))
-		: scoped;
+	const products = stock ? scoped.filter((product) => matchesStockFilter(product)) : scoped;
 	// the toggle's own count is always the total, so it doesn't jump around
 	// as the stock tab changes
 	const availableCount = allProducts.filter((p) => p.isAvailable).length;
@@ -74,12 +72,6 @@ export default async function AdminProductsPage({ searchParams }: Props) {
 									href: buildHref({ available: availableOnly }),
 									count: counts.all,
 									active: !stock,
-								},
-								{
-									label: 'Low stock',
-									href: buildHref({ stock: 'low', available: availableOnly }),
-									count: counts.low,
-									active: stock === 'low',
 								},
 								{
 									label: 'Sold out',

@@ -82,11 +82,6 @@ export const columns: ColumnDef<ProductProps>[] = [
 				<div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center sm:gap-2">
 					{quantity}
 					{optionCount > 0 && <ProductOptionsDialog product={row.original} />}
-					{status === 'low' && (
-						<Badge variant="secondary" className="whitespace-nowrap px-2 sm:px-2.5">
-							Low
-						</Badge>
-					)}
 					{status === 'sold-out' && (
 						<Badge variant="destructive" className="whitespace-nowrap px-2 sm:px-2.5">
 							Sold out

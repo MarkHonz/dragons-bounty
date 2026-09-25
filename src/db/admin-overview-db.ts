@@ -25,7 +25,6 @@ export const getAdminOverview = async () => {
 
 	return {
 		ordersToShip: orderCounts.shipping,
-		lowStock: stock.low,
 		soldOut: stock.out,
 		// a part-refunded order (refunded in Stripe, not yet fully) counts for what is left
 		todaySalesInCents:

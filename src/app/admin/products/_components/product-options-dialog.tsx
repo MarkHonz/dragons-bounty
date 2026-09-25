@@ -82,11 +82,6 @@ export default function ProductOptionsDialog({
 										{variant.quantity}
 									</TableCell>
 									<TableCell>
-										{status === 'low' && (
-											<Badge variant="secondary" className="whitespace-nowrap">
-												Low
-											</Badge>
-										)}
 										{status === 'sold-out' && (
 											<Badge variant="destructive" className="whitespace-nowrap">
 												Sold out

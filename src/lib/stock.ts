@@ -13,13 +13,14 @@ export const getStockStatus = (
 	return 'ok';
 };
 
-// The stock filters the admin can pick, as they appear in the URL (?stock=low)
-export type StockFilter = 'low' | 'out';
+// The stock filters the admin can pick, as they appear in the URL (?stock=out).
+// Most products here are hand-made and one of a kind, so a "low stock"
+// threshold isn't meaningful to this client; only sold-out is offered.
+export type StockFilter = 'out';
 
 export const parseStockFilter = (
 	value: string | undefined
-): StockFilter | undefined =>
-	value === 'low' || value === 'out' ? value : undefined;
+): StockFilter | undefined => (value === 'out' ? value : undefined);
 
 type StockedProduct = {
 	quantity: number | null;
@@ -41,15 +42,12 @@ export const getProductStockStatus = (product: StockedProduct): StockStatus => {
 	return 'ok';
 };
 
-export const matchesStockFilter = (
-	product: StockedProduct,
-	filter: StockFilter
-) => getProductStockStatus(product) === (filter === 'low' ? 'low' : 'sold-out');
+export const matchesStockFilter = (product: StockedProduct) =>
+	getProductStockStatus(product) === 'sold-out';
 
-// How many products are low or sold out. The products page and the dashboard
-// both use this, so their numbers always agree.
+// How many products are sold out. The products page and the dashboard both
+// use this, so their numbers always agree.
 export const countStock = (products: StockedProduct[]) => ({
 	all: products.length,
-	low: products.filter((p) => getProductStockStatus(p) === 'low').length,
 	out: products.filter((p) => getProductStockStatus(p) === 'sold-out').length,
 });
