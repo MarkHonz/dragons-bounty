@@ -12,6 +12,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { userSubmit } from '@/actions/user-actions';
@@ -138,9 +139,9 @@ export default function CreateUserForm({ next }: CreateUserFormProps) {
 										<FormItem className="pb-2">
 											<FormLabel className="pl-2">Password</FormLabel>
 											<FormControl>
-												<Input
+												<PasswordInput
 													placeholder="password"
-													type="password"
+													autoComplete="new-password"
 													{...field}
 												/>
 											</FormControl>
@@ -157,9 +158,9 @@ export default function CreateUserForm({ next }: CreateUserFormProps) {
 										<FormItem className="pb-2">
 											<FormLabel className="pl-2">Confirm Password</FormLabel>
 											<FormControl>
-												<Input
+												<PasswordInput
 													placeholder="retype password"
-													type="password"
+													autoComplete="new-password"
 													{...field}
 												/>
 											</FormControl>
