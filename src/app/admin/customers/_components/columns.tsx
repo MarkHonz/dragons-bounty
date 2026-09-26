@@ -18,6 +18,11 @@ export const columns: ColumnDef<CustomerRow>[] = [
 				{row.original.role === 'ADMIN' && (
 					<Badge className="ml-2 align-middle">Admin</Badge>
 				)}
+				{row.original.isArtist && (
+					<Badge variant="secondary" className="ml-2 align-middle">
+						Artist
+					</Badge>
+				)}
 				{/* the Email column is hidden on phones */}
 				<p className="break-all text-xs text-muted-foreground sm:hidden">
 					{row.original.email}

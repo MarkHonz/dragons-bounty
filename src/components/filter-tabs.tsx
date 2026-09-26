@@ -19,7 +19,7 @@ export default function FilterTabs({
 	options: FilterOption[];
 }) {
 	return (
-		<nav aria-label={label} className="mb-4 flex flex-wrap gap-2">
+		<nav aria-label={label} className="flex flex-wrap gap-2">
 			{options.map((option) => (
 				<Link
 					key={option.href}

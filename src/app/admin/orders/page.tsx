@@ -46,30 +46,37 @@ export default async function AdminOrdersPage({ searchParams }: Props) {
 				</h2>
 			) : (
 				<>
-					<FilterTabs
-						label="Filter orders"
-						options={[
-							{ label: 'All', href: '/admin/orders', count: counts.all, active: !status },
-							{
-								label: 'Needs shipping',
-								href: '/admin/orders?status=shipping',
-								count: counts.shipping,
-								active: status === 'shipping',
-							},
-							{
-								label: 'Fulfilled',
-								href: '/admin/orders?status=fulfilled',
-								count: counts.fulfilled,
-								active: status === 'fulfilled',
-							},
-							{
-								label: 'Refunded',
-								href: '/admin/orders?status=refunded',
-								count: counts.refunded,
-								active: status === 'refunded',
-							},
-						]}
-					/>
+					<div className="mb-4">
+						<FilterTabs
+							label="Filter orders"
+							options={[
+								{
+									label: 'All',
+									href: '/admin/orders',
+									count: counts.all,
+									active: !status,
+								},
+								{
+									label: 'Needs shipping',
+									href: '/admin/orders?status=shipping',
+									count: counts.shipping,
+									active: status === 'shipping',
+								},
+								{
+									label: 'Fulfilled',
+									href: '/admin/orders?status=fulfilled',
+									count: counts.fulfilled,
+									active: status === 'fulfilled',
+								},
+								{
+									label: 'Refunded',
+									href: '/admin/orders?status=refunded',
+									count: counts.refunded,
+									active: status === 'refunded',
+								},
+							]}
+						/>
+					</div>
 					<Card className="p-2 shadow-warm-sm">
 						<DataTable
 							// a new filter starts the table fresh (search, sort and page)

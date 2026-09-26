@@ -118,6 +118,7 @@ export type CustomerRow = {
 	cartId: string | null;
 	role: string;
 	emailVerified: boolean;
+	isArtist: boolean;
 };
 
 export const getCustomers = async (): Promise<CustomerRow[]> => {
@@ -127,6 +128,7 @@ export const getCustomers = async (): Promise<CustomerRow[]> => {
 			email: true,
 			role: true,
 			emailVerified: true,
+			isArtist: true,
 			profile: { select: { name: true, Cart: { select: { id: true } } } },
 		},
 		orderBy: { createdAt: 'desc' },
@@ -139,6 +141,7 @@ export const getCustomers = async (): Promise<CustomerRow[]> => {
 		cartId: user.profile?.Cart?.id ?? null,
 		role: user.role,
 		emailVerified: user.emailVerified,
+		isArtist: user.isArtist,
 	}));
 };
 

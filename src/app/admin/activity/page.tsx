@@ -38,23 +38,25 @@ export default async function ActivityPage({
 				</Card>
 			) : (
 				<>
-					<FilterTabs
-						label="Filter activity"
-						options={[
-							{
-								label: 'All',
-								href: '/admin/activity',
-								count: counts.all,
-								active: !area,
-							},
-							...ACTIVITY_AREAS.map((option) => ({
-								label: ACTIVITY_AREA_LABELS[option],
-								href: `/admin/activity?area=${option}`,
-								count: counts[option],
-								active: area === option,
-							})),
-						]}
-					/>
+					<div className="mb-4">
+						<FilterTabs
+							label="Filter activity"
+							options={[
+								{
+									label: 'All',
+									href: '/admin/activity',
+									count: counts.all,
+									active: !area,
+								},
+								...ACTIVITY_AREAS.map((option) => ({
+									label: ACTIVITY_AREA_LABELS[option],
+									href: `/admin/activity?area=${option}`,
+									count: counts[option],
+									active: area === option,
+								})),
+							]}
+						/>
+					</div>
 					<Card className="p-2 shadow-warm-sm">
 						<DataTable
 							// a new filter starts the table fresh (search, sort and page)
