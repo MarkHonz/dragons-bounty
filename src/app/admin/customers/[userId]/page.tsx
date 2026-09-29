@@ -31,7 +31,7 @@ export default async function AdminCustomerDetailPage({
 			<main className="mx-auto max-w-xl">
 				<h2 className="text-xl font-semibold">Customer not found</h2>
 				<Link href="/admin/customers" className="text-sm text-primary">
-					Back to users
+					Back to Customers
 				</Link>
 			</main>
 		);
@@ -60,7 +60,7 @@ export default async function AdminCustomerDetailPage({
 			<header className="mb-6 flex items-center justify-between">
 				<h1 className="font-display text-3xl font-semibold">Customer</h1>
 				<Link href="/admin/customers" className="text-sm text-primary">
-					Back to users
+					Back to Customers
 				</Link>
 			</header>
 
