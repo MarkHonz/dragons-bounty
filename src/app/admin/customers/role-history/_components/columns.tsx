@@ -6,9 +6,25 @@ import { ArrowRight } from 'lucide-react';
 
 import SortableHeader from '@/components/sortable-header';
 import { Badge } from '@/components/ui/badge';
-import type { RoleChangeRow } from '@/db/user-db';
 
-const roleLabel = (role: string) => (role === 'ADMIN' ? 'Admin' : 'Customer');
+// One row, whether it came from an admin change or an artist change: what the
+// Change column shows is already reduced to a from/to label pair, so the table
+// doesn't need to know the difference beyond the Type badge.
+export type HistoryRow = {
+	id: string;
+	createdAt: Date;
+	kind: 'ROLE' | 'ARTIST';
+	targetId: string | null;
+	targetEmail: string;
+	targetName: string | null;
+	fromLabel: string;
+	toLabel: string;
+	// how "elevated" the change reads: default = admin/became an artist,
+	// secondary/outline = a step down. Set once when the row is built.
+	toVariant: 'default' | 'secondary' | 'outline';
+	actorEmail: string;
+	actorName: string | null;
+};
 
 // the time is formatted in the reader's own time zone, so it can differ from the
 // server's; suppressHydrationWarning keeps React from complaining about that
@@ -18,9 +34,9 @@ const When = ({ value }: { value: Date }) => (
 	</time>
 );
 
-const byLabel = (row: RoleChangeRow) => row.actorName || row.actorEmail;
+const byLabel = (row: HistoryRow) => row.actorName || row.actorEmail;
 
-export const columns: ColumnDef<RoleChangeRow>[] = [
+export const columns: ColumnDef<HistoryRow>[] = [
 	{
 		accessorKey: 'createdAt',
 		header: ({ column }) => <SortableHeader column={column} label="When" />,
@@ -58,29 +74,42 @@ export const columns: ColumnDef<RoleChangeRow>[] = [
 					{!change.targetId && (
 						<p className="text-xs text-muted-foreground">Account deleted</p>
 					)}
-					{/* the When and Changed by columns are hidden on phones */}
+					{/* the Type, When and Changed by columns are hidden on phones */}
 					<p className="text-xs text-muted-foreground sm:hidden">
-						<When value={change.createdAt} /> · by {byLabel(change)}
+						{change.kind === 'ROLE' ? 'Admin' : 'Artist'} · <When value={change.createdAt} />{' '}
+						· by {byLabel(change)}
 					</p>
 				</div>
 			);
 		},
 	},
 	{
+		id: 'type',
+		accessorFn: (row) => (row.kind === 'ROLE' ? 'Admin' : 'Artist'),
+		header: ({ column }) => <SortableHeader column={column} label="Type" />,
+		sortingFn: 'alphanumeric',
+		meta: { className: 'hidden sm:table-cell' },
+		cell: ({ row }) => (
+			<Badge
+				variant={row.original.kind === 'ROLE' ? 'default' : 'secondary'}
+				className="whitespace-nowrap px-2"
+			>
+				{row.original.kind === 'ROLE' ? 'Admin' : 'Artist'}
+			</Badge>
+		),
+	},
+	{
 		id: 'change',
-		accessorFn: (row) => `${row.fromRole}>${row.toRole}`,
+		accessorFn: (row) => `${row.fromLabel}>${row.toLabel}`,
 		header: ({ column }) => <SortableHeader column={column} label="Change" />,
 		cell: ({ row }) => (
 			<div className="flex flex-wrap items-center gap-1.5">
 				<Badge variant="outline" className="whitespace-nowrap px-2">
-					{roleLabel(row.original.fromRole)}
+					{row.original.fromLabel}
 				</Badge>
 				<ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-label="to" />
-				<Badge
-					variant={row.original.toRole === 'ADMIN' ? 'default' : 'secondary'}
-					className="whitespace-nowrap px-2"
-				>
-					{roleLabel(row.original.toRole)}
+				<Badge variant={row.original.toVariant} className="whitespace-nowrap px-2">
+					{row.original.toLabel}
 				</Badge>
 			</div>
 		),

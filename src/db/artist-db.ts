@@ -12,6 +12,41 @@ export const getArtists = async () =>
 		orderBy: { artistName: 'asc' },
 	});
 
+export type ArtistChangeRow = {
+	id: string;
+	createdAt: Date;
+	kind: 'ADDED' | 'REMOVED' | 'RENAMED';
+	fromName: string | null;
+	toName: string | null;
+	targetId: string | null;
+	targetEmail: string;
+	targetName: string | null;
+	actorEmail: string;
+	actorName: string | null;
+};
+
+// Every artist change (made, renamed, removed), newest first. Only what the
+// history page shows leaves the database: nothing else about the accounts.
+export const getArtistChanges = async (): Promise<ArtistChangeRow[]> => {
+	const rows = await db.artistChange.findMany({
+		orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+		select: {
+			id: true,
+			createdAt: true,
+			kind: true,
+			fromName: true,
+			toName: true,
+			targetId: true,
+			targetEmail: true,
+			targetName: true,
+			actorEmail: true,
+			actorName: true,
+		},
+	});
+	// the column is a plain string in SQLite; this is exhaustive at the call site
+	return rows as ArtistChangeRow[];
+};
+
 export const isArtistAccount = async (userId: string) => {
 	const user = await db.user.findUnique({
 		where: { id: userId },
@@ -39,22 +74,58 @@ export type ArtistStatusResult =
 	| 'name-taken';
 
 // Make someone an artist (with their public name), rename one, or remove the
-// status. Their products and past orders are never touched. Throws on a
-// database error.
+// status. Their products and past orders are never touched. Records one
+// ArtistChange row per real change (added / renamed / removed), the same way
+// changeUserRole records a RoleChange. Throws on a database error, or if the
+// admin making the change no longer exists.
 export const setArtistStatus = async (
 	userId: string,
-	change: { isArtist: true; artistName: string } | { isArtist: false }
+	change: { isArtist: true; artistName: string } | { isArtist: false },
+	actorId: string
 ): Promise<ArtistStatusResult> =>
 	db.$transaction(async (tx) => {
 		const user = await tx.user.findUnique({
 			where: { id: userId },
-			select: { isArtist: true, artistName: true, emailVerified: true },
+			select: {
+				isArtist: true,
+				artistName: true,
+				emailVerified: true,
+				email: true,
+				profile: { select: { name: true } },
+			},
 		});
 		if (!user) return 'not-found';
+
+		const recordChange = async (
+			kind: 'ADDED' | 'REMOVED' | 'RENAMED',
+			fromName: string | null,
+			toName: string | null
+		) => {
+			const actor = await tx.user.findUnique({
+				where: { id: actorId },
+				select: { email: true, profile: { select: { name: true } } },
+			});
+			if (!actor) throw new Error('The admin making the change no longer exists');
+			await tx.artistChange.create({
+				data: {
+					kind,
+					fromName,
+					toName,
+					targetId: userId,
+					targetEmail: user.email,
+					targetName: user.profile?.name ?? null,
+					actorId,
+					actorEmail: actor.email,
+					actorName: actor.profile?.name ?? null,
+				},
+			});
+		};
+
 		if (!change.isArtist) {
 			if (!user.isArtist) return 'unchanged';
 			// the name is kept, so "Made by" still reads correctly on their products
 			await tx.user.update({ where: { id: userId }, data: { isArtist: false } });
+			await recordChange('REMOVED', user.artistName, null);
 			return 'changed';
 		}
 		if (!user.emailVerified) return 'unverified';
@@ -68,10 +139,16 @@ export const setArtistStatus = async (
 		if (others.some((other) => other.artistName?.toLowerCase() === wanted)) {
 			return 'name-taken';
 		}
+		const wasArtist = user.isArtist;
 		await tx.user.update({
 			where: { id: userId },
 			data: { isArtist: true, artistName: change.artistName },
 		});
+		await recordChange(
+			wasArtist ? 'RENAMED' : 'ADDED',
+			wasArtist ? user.artistName : null,
+			change.artistName
+		);
 		return 'changed';
 	});
 

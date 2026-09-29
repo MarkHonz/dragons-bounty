@@ -11,24 +11,26 @@ datasource db {
 }
 
 model User {
-  id                  String              @id @default(cuid())
-  password            String
-  email               String              @unique
-  emailVerified       Boolean             @default(false)
-  role                String              @default("USER") // This is a string attribute with a default value
+  id                    String              @id @default(cuid())
+  password              String
+  email                 String              @unique
+  emailVerified         Boolean             @default(false)
+  role                  String              @default("USER") // This is a string attribute with a default value
   // an artist sells their own products here and ships them; independent of role
-  isArtist            Boolean             @default(false)
-  artistName          String? // the public "Made by" name, set when made an artist
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  profile             Profile? // This is a one-to-one relation
-  sessions            Session[] // This is a one-to-many relation (important!)
-  verificationTokens  VerificationToken[] // This is a one-to-many relation
-  roleChangesReceived RoleChange[]        @relation("RoleChangeTarget")
-  roleChangesMade     RoleChange[]        @relation("RoleChangeActor")
-  orderNotes          OrderNote[]
-  activity            ActivityLog[]
-  artistProducts      Product[]           @relation("ProductArtist")
+  isArtist              Boolean             @default(false)
+  artistName            String? // the public "Made by" name, set when made an artist
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  profile               Profile? // This is a one-to-one relation
+  sessions              Session[] // This is a one-to-many relation (important!)
+  verificationTokens    VerificationToken[] // This is a one-to-many relation
+  roleChangesReceived   RoleChange[]        @relation("RoleChangeTarget")
+  roleChangesMade       RoleChange[]        @relation("RoleChangeActor")
+  artistChangesReceived ArtistChange[]      @relation("ArtistChangeTarget")
+  artistChangesMade     ArtistChange[]      @relation("ArtistChangeActor")
+  orderNotes            OrderNote[]
+  activity              ActivityLog[]
+  artistProducts        Product[]           @relation("ProductArtist")
 }
 
 // One row each time an admin makes or removes another admin. The emails and
@@ -47,6 +49,27 @@ model RoleChange {
   targetId    String?
   actor       User?    @relation("RoleChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
   actorId     String?
+
+  @@index([createdAt])
+}
+
+// One row each time an admin makes, renames, or removes an artist. The emails
+// and names are copied in, so the history still reads correctly after someone
+// is renamed or deleted (targetId / actorId then become null).
+model ArtistChange {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  kind        String // ADDED | REMOVED | RENAMED
+  fromName    String? // the artist name before (null for ADDED)
+  toName      String? // the artist name after (null for REMOVED)
+  target      User?    @relation("ArtistChangeTarget", fields: [targetId], references: [id], onDelete: SetNull)
+  targetId    String?
+  targetEmail String
+  targetName  String? // the account's own name, not the artist name
+  actor       User?    @relation("ArtistChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId     String?
+  actorEmail  String
+  actorName   String?
 
   @@index([createdAt])
 }

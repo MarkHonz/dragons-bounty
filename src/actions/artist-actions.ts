@@ -198,7 +198,8 @@ export const setArtistStatusAction = async (
 	try {
 		result = await setArtistStatus(
 			userId,
-			isArtist ? { isArtist: true, artistName: name } : { isArtist: false }
+			isArtist ? { isArtist: true, artistName: name } : { isArtist: false },
+			admin.id
 		);
 	} catch (error) {
 		console.error('Failed to change artist status', error);
