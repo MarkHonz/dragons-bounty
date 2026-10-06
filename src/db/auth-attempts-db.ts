@@ -12,13 +12,15 @@ import {
 
 // What is being limited. SIGN_IN and CHANGE_PASSWORD are wrong-password guesses;
 // the others cap how often an account (or a target address) can make the site
-// send emails.
+// send emails. CONTACT caps custom-art requests per sender (their email, or
+// phone digits) and per network address.
 export type AttemptKind =
 	| 'SIGN_IN'
 	| 'CHANGE_PASSWORD'
 	| 'EMAIL_CHANGE'
 	| 'EMAIL_CHANGE_TARGET'
-	| 'VERIFY_RESEND';
+	| 'VERIFY_RESEND'
+	| 'CONTACT';
 
 export type AttemptDecision =
 	| { allowed: true }

@@ -16,6 +16,7 @@ import { buildEmailChangeRequestedEmail } from '@/lib/emails/email-change-reques
 import { buildEmailChangedEmail } from '@/lib/emails/email-changed-email';
 import { buildArtistNewOrderEmail } from '@/lib/emails/artist-new-order-email';
 import { buildArtistStatusEmail } from '@/lib/emails/artist-status-email';
+import { buildCustomRequestEmail } from '@/lib/emails/custom-request-email';
 
 type SendVerificationEmailProps = {
 	name: string;
@@ -286,4 +287,23 @@ export const sendArtistStatusEmail = async ({
 }: SendArtistStatusEmailProps) => {
 	const { subject, html, text } = buildArtistStatusEmail(props);
 	return sendEmail({ to: email, subject, html, text });
+};
+
+type SendCustomRequestEmailProps = Parameters<typeof buildCustomRequestEmail>[0] & {
+	email: string;
+};
+
+// Replies go to the person who asked (when they gave an email).
+export const sendCustomRequestEmail = async ({
+	email,
+	...props
+}: SendCustomRequestEmailProps) => {
+	const { subject, html, text } = buildCustomRequestEmail(props);
+	return sendEmail({
+		to: email,
+		subject,
+		html,
+		text,
+		replyTo: props.request.email ?? undefined,
+	});
 };

@@ -163,7 +163,7 @@ export default async function AdminDashboardPage() {
 				<h2 id="needs-attention" className="mb-3 font-display text-xl font-semibold">
 					Needs attention
 				</h2>
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 					<StatTile
 						href="/admin/orders?status=shipping"
 						label="Orders to ship"
@@ -183,6 +183,13 @@ export default async function AdminDashboardPage() {
 						value={overview.soldOut}
 						note={overview.soldOut > 0 ? 'Products with none left' : 'Nothing sold out'}
 						attention={overview.soldOut > 0}
+					/>
+					<StatTile
+						href="/admin/requests?status=NEW"
+						label="New custom requests"
+						value={overview.newRequests}
+						note={overview.newRequests > 0 ? 'Waiting for a reply' : 'All answered'}
+						attention={overview.newRequests > 0}
 					/>
 				</div>
 			</section>

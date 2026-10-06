@@ -31,6 +31,7 @@ model User {
   orderNotes            OrderNote[]
   activity              ActivityLog[]
   artistProducts        Product[]           @relation("ProductArtist")
+  customRequests        CustomRequest[]
 }
 
 // One row each time an admin makes or removes another admin. The emails and
@@ -335,4 +336,25 @@ model AuthAttempt {
 
   @@index([kind, subject, createdAt])
   @@index([kind, ip, createdAt])
+}
+
+// A visitor asking for custom art, from the /custom-orders form. Each admin is
+// emailed too, but this row is the record (and the only copy while no email
+// service is connected).
+model CustomRequest {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  name             String
+  email            String?
+  phone            String?
+  preferredContact String? // EMAIL | PHONE, only when both were given
+  description      String
+  budget           String? // UNDER_50 | 50_150 | 150_500 | 500_PLUS | NOT_SURE
+  neededBy         String? // YYYY-MM-DD, as picked
+  status           String   @default("NEW") // NEW | REPLIED | CLOSED
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId           String? // set when they were signed in
+
+  @@index([status, createdAt])
 }

@@ -36,6 +36,7 @@ export default async function MainHeader() {
 			label: category.name,
 		})),
 		{ href: '/#gallery', label: 'Gallery' },
+		{ href: '/custom-orders', label: 'Custom Art' },
 	];
 
 	return (

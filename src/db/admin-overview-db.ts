@@ -2,6 +2,7 @@ import db from '@/db/db';
 import { getOrderStatusCounts } from '@/db/orders-db';
 import { getShippingProgress } from '@/db/shipment-db';
 import { countStock } from '@/lib/stock';
+import { countNewCustomRequests } from '@/db/custom-request-db';
 import { salesWindowStart, summarizeDashboardSales } from '@/lib/sales-stats';
 import { startOfShopMonth } from '@/lib/shop-time';
 import { orderShippingLabel } from '@/lib/shipping-status';
@@ -24,6 +25,7 @@ export const getAdminOverview = async (now = new Date()) => {
 		customers,
 		newCustomers,
 		artists,
+		newRequests,
 	] = await Promise.all([
 		getOrderStatusCounts(),
 		db.product.findMany({
@@ -71,6 +73,7 @@ export const getAdminOverview = async (now = new Date()) => {
 		db.user.count(),
 		db.user.count({ where: { createdAt: { gte: startOfShopMonth(now) } } }),
 		db.user.count({ where: { isArtist: true } }),
+		countNewCustomRequests(),
 	]);
 
 	const stock = countStock(products);
@@ -80,6 +83,7 @@ export const getAdminOverview = async (now = new Date()) => {
 		ordersToShip: orderCounts.shipping,
 		oldestToShipAt: oldestToShip?.createdAt ?? null,
 		soldOut: stock.out,
+		newRequests,
 		sales: summarizeDashboardSales(salesOrders, now),
 		recentOrders: recent.map((order) => ({
 			id: order.id,
