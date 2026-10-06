@@ -32,6 +32,7 @@ model User {
   activity              ActivityLog[]
   artistProducts        Product[]           @relation("ProductArtist")
   customRequests        CustomRequest[]
+  requestNotes          RequestNote[]
 }
 
 // One row each time an admin makes or removes another admin. The emails and
@@ -342,9 +343,9 @@ model AuthAttempt {
 // emailed too, but this row is the record (and the only copy while no email
 // service is connected).
 model CustomRequest {
-  id               String   @id @default(cuid())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id               String        @id @default(cuid())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
   name             String
   email            String?
   phone            String?
@@ -352,9 +353,26 @@ model CustomRequest {
   description      String
   budget           String? // UNDER_50 | 50_150 | 150_500 | 500_PLUS | NOT_SURE
   neededBy         String? // YYYY-MM-DD, as picked
-  status           String   @default("NEW") // NEW | REPLIED | CLOSED
-  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status           String        @default("NEW") // NEW | REPLIED | CLOSED
+  user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId           String? // set when they were signed in
+  notes            RequestNote[]
 
   @@index([status, createdAt])
+}
+
+// An admin-only note on a custom art request. The author's email and name are
+// copied in so the note still reads correctly if the account changes.
+model RequestNote {
+  id          String        @id @default(cuid())
+  body        String
+  createdAt   DateTime      @default(now())
+  authorEmail String
+  authorName  String?
+  author      User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId    String?
+  request     CustomRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId   String
+
+  @@index([requestId])
 }

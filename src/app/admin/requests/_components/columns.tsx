@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ColumnDef } from '@tanstack/react-table';
+import { StickyNote } from 'lucide-react';
 
 import SortableHeader from '@/components/sortable-header';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,21 @@ export const columns: ColumnDef<CustomRequestRow>[] = [
 				>
 					{row.original.name}
 				</Link>
+				{/* admins can see at a glance which requests have notes */}
+				{row.original.noteCount > 0 && (
+					<span
+						className="ml-2 inline-flex items-center gap-0.5 align-middle text-xs text-muted-foreground"
+						title={`${row.original.noteCount} ${row.original.noteCount === 1 ? 'note' : 'notes'}`}
+					>
+						<StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
+						<span aria-hidden="true">{row.original.noteCount}</span>
+						<span className="sr-only">
+							{row.original.noteCount === 1
+								? '1 note'
+								: `${row.original.noteCount} notes`}
+						</span>
+					</span>
+				)}
 				{row.original.email && (
 					<p className="break-all text-xs text-muted-foreground">{row.original.email}</p>
 				)}

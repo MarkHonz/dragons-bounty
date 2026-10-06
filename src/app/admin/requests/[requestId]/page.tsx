@@ -5,12 +5,14 @@ import LocalTime from '@/components/local-time';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCustomRequest } from '@/db/custom-request-db';
+import { getRequestNotes } from '@/db/request-notes-db';
 import {
 	budgetLabel,
 	formatNeededBy,
 	parseRequestStatus,
 	STATUS_LABELS,
 } from '@/lib/custom-request-rules';
+import RequestNotes from './request-notes';
 import StatusButtons from './status-buttons';
 
 type Props = { params: { requestId: string } };
@@ -25,6 +27,7 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
 export default async function AdminRequestPage({ params }: Props) {
 	const request = await getCustomRequest(params.requestId);
 	if (!request) notFound();
+	const notes = await getRequestNotes(request.id);
 	const status = parseRequestStatus(request.status) ?? 'NEW';
 	// a phone number as a tel: link: just the digits and a leading +
 	const telHref = request.phone ? `tel:${request.phone.replace(/[^\d+]/g, '')}` : null;
@@ -101,6 +104,7 @@ export default async function AdminRequestPage({ params }: Props) {
 					</div>
 				</CardContent>
 			</Card>
+			<RequestNotes requestId={request.id} notes={notes} />
 		</main>
 	);
 }

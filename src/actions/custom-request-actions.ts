@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { logActivity } from '@/db/activity-db';
 import { beginAttempt } from '@/db/auth-attempts-db';
 import { createCustomRequest, setCustomRequestStatus } from '@/db/custom-request-db';
+import { addRequestNote, deleteRequestNote } from '@/db/request-notes-db';
+import { MAX_NOTE_LENGTH } from '@/lib/order-notes';
 import { getOtherAdmins } from '@/db/user-db';
 import { tooManyRequestsMessage } from '@/lib/attempt-limits';
 import { assertAdminOrThrow, verifyAuthSession } from '@/lib/auth';
@@ -123,4 +125,79 @@ export const setCustomRequestStatusAction = async (
 	revalidatePath(`/admin/requests/${id}`);
 	revalidatePath('/admin');
 	return { ok: true, message: `Marked as ${STATUS_LABELS[next]}.` };
+};
+
+// Admin only: add a note to a request. The log says a note was added, not what
+// it says.
+export const addRequestNoteAction = async (requestId: string, body: string) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	if (typeof requestId !== 'string' || typeof body !== 'string') {
+		response.errors.push('Invalid note.');
+		return response;
+	}
+	const text = body.trim();
+	if (text.length === 0) {
+		response.errors.push('Write something first.');
+		return response;
+	}
+	if (text.length > MAX_NOTE_LENGTH) {
+		response.errors.push(`Notes can be up to ${MAX_NOTE_LENGTH} characters.`);
+		return response;
+	}
+
+	let name;
+	try {
+		name = await addRequestNote(requestId, admin.id, text);
+	} catch (error) {
+		console.error('Failed to add a request note', error);
+		response.errors.push('Failed to save the note. Please try again.');
+		return response;
+	}
+	if (name === null) {
+		response.errors.push('Request not found.');
+		return response;
+	}
+
+	await logActivity(
+		admin.id,
+		'CUSTOMER',
+		`Added a note to the custom art request from ${name}`
+	);
+	revalidatePath('/admin/requests');
+	revalidatePath(`/admin/requests/${requestId}`);
+	response.success = true;
+	return response;
+};
+
+// Admin only: delete a note from a request.
+export const deleteRequestNoteAction = async (noteId: string) => {
+	const { user: admin } = await assertAdminOrThrow();
+
+	const response: { errors: string[]; success: boolean } = {
+		errors: [],
+		success: false,
+	};
+
+	const deleted =
+		typeof noteId === 'string' ? await deleteRequestNote(noteId) : null;
+	if (!deleted) {
+		response.errors.push('That note no longer exists.');
+		return response;
+	}
+
+	await logActivity(
+		admin.id,
+		'CUSTOMER',
+		`Deleted a note from the custom art request from ${deleted.name}`
+	);
+	revalidatePath('/admin/requests');
+	revalidatePath(`/admin/requests/${deleted.requestId}`);
+	response.success = true;
+	return response;
 };

@@ -20,14 +20,16 @@ export type CustomRequestRow = {
 	budget: string | null;
 	neededBy: string | null;
 	status: string;
+	// how many admin notes it has
+	noteCount: number;
 };
 
 // The admin list, newest first, optionally one status only. Only what the
 // table shows (and searches) leaves the database.
 export const getCustomRequests = async (
 	status?: RequestStatus
-): Promise<CustomRequestRow[]> =>
-	db.customRequest.findMany({
+): Promise<CustomRequestRow[]> => {
+	const rows = await db.customRequest.findMany({
 		where: status ? { status } : undefined,
 		orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
 		select: {
@@ -40,8 +42,11 @@ export const getCustomRequests = async (
 			budget: true,
 			neededBy: true,
 			status: true,
+			_count: { select: { notes: true } },
 		},
 	});
+	return rows.map(({ _count, ...row }) => ({ ...row, noteCount: _count.notes }));
+};
 
 export const getCustomRequestCounts = async () => {
 	const groups = await db.customRequest.groupBy({
